@@ -13,7 +13,12 @@
 
   <style>
     :root{
-      --bg-dark: #07102a;
+      --bg-dark: linear-gradient(
+		180deg,
+		rgba(7,16,42,0.12) 0%,
+		rgba(7,16,42,0.25) 40%,
+		rgba(7,16,42,0.35) 100%
+	);
       --panel-rgba: rgba(7,16,42,0.12); /* lebih transparan supaya Vanta terlihat */
       --nav-rgba: rgba(7,16,42,0.20);
       --accent: #8b5cff;
@@ -70,17 +75,6 @@
       padding: 6rem 6rem;
       box-sizing: border-box;
       background: transparent; /* jangan timpa Vanta */
-    }
-
-    .hero-panel {
-      max-width: 1100px;
-      background: var(--panel-rgba);   /* sangat transparan */
-      padding: 42px 48px;
-      border-radius: 14px;
-      backdrop-filter: blur(8px);      /* blur untuk keterbacaan */
-      box-shadow: 0 18px 48px rgba(4,9,24,0.28); /* lebih lembut */
-      z-index: 10;                     /* berada di atas Vanta */
-      border: 1px solid rgba(255,255,255,0.02);
     }
 
     .title {
@@ -152,7 +146,7 @@
   <main class="hero" role="main">
     <div class="hero-panel" role="region" aria-label="hero">
       <h1 class="title">PROACTIVE <span class="accent">IN DEFENSE</span></h1>
-      <p class="lead">Integrating advanced human expertise with Generative AI. We hunt threats before they hunt you.</p>
+      <p class="lead">Practice makes perfect!.</p>
       <a class="cta" href="secdashboard.html">Open Security Dashboard →</a>
     </div>
   </main>
