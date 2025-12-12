@@ -3,208 +3,149 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RA Security - Landing</title>
-  <link rel="icon" href="/images/favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+  <title>RA Security – Proactive Defense</title>
 
-  <!-- Optional: Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600;800;900&display=swap" rel="stylesheet">
+  <!-- Favicon -->
+  <link rel="icon" href="/images/favicon.ico">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind (for premium UI styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    :root{
-      --bg-dark: linear-gradient(
-		180deg,
-		rgba(7,16,42,0.12) 0%,
-		rgba(7,16,42,0.25) 40%,
-		rgba(7,16,42,0.35) 100%
-	);
-      --panel-rgba: rgba(7,16,42,0.12); /* lebih transparan supaya Vanta terlihat */
-      --nav-rgba: rgba(7,16,42,0.20);
-      --accent: #8b5cff;
-      --cta-bg: #1f6feb;
-      --text-muted: #c9d6e6;
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #060a12;
+      color: #e5e7eb;
+      overflow-x: hidden;
     }
 
-    html,body {
-      height:100%;
-      margin:0;
-      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background: var(--bg-dark);
-      color: #fff;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
+    /* Glass effect for panel */
+    .glass {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
     }
 
-    /* Vanta canvas container (always behind) */
+    /* Vanta background container */
     #vanta-bg {
       position: fixed;
       inset: 0;
-      z-index: -2;            /* pastikan selalu paling belakang */
-      pointer-events: none;
-      background: var(--bg-dark);
+      z-index: -1;
     }
 
-    /* NAV */
-    nav {
-      position: fixed;
-      top: 18px;
-      right: 24px;
-      z-index: 30;
-      display:flex;
-      gap: 18px;
-      align-items:center;
-      padding: 8px 12px;
-      border-radius: 10px;
-      background: var(--nav-rgba);
-      backdrop-filter: blur(6px);
-      box-shadow: 0 6px 18px rgba(2,6,23,0.18);
-    }
-    nav a {
-      color: #bcd2ff;
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    /* HERO */
-    .hero {
-      position: relative;
-      min-height: 88vh;
-      display:flex;
-      align-items:center;
-      padding: 6rem 6rem;
-      box-sizing: border-box;
-      background: transparent; /* jangan timpa Vanta */
-    }
-
-    .title {
-      font-size: 84px;
-      margin: 0 0 12px 0;
-      line-height: 0.95;
-      font-weight: 900;
-      letter-spacing: -1px;
-    }
-    /* "IN DEFENSE" gradient */
-    .title .accent {
-      display:inline-block;
-      background: linear-gradient(90deg,#7b61ff,#ff5fb6);
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(90deg, #7b5cff, #ff5fb6);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
 
-    .lead {
-      margin: 12px 0 22px 0;
-      color: var(--text-muted);
-      font-size: 18px;
-      max-width: 900px;
+    .hover-card:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 30px rgba(139,92,255,0.25);
     }
 
-    .cta {
-      display:inline-block;
-      background: var(--cta-bg);
-      color: white;
-      padding: 12px 22px;
-      border-radius: 10px;
-      text-decoration: none;
-      font-weight: 700;
-      box-shadow: 0 8px 22px rgba(31,111,235,0.18);
-    }
-
-    /* small screens */
-    @media (max-width: 900px) {
-      .hero { padding: 3rem 2rem; }
-      .hero-panel { padding: 28px; border-radius:12px; }
-      .title { font-size: 42px; }
-      .lead { font-size: 15px; }
-    }
-
-    /* ensure sections below hero reveal Vanta shapes partially */
-    .below {
-      min-height: 40vh;
-      background: linear-gradient(180deg, rgba(6,11,30,0.0), rgba(6,11,30,0.12));
-      padding: 2rem 6rem;
-      box-sizing: border-box;
-    }
-
-    /* small accessibility tweaks */
-    a:focus { outline: 3px solid rgba(139,92,255,0.18); outline-offset: 3px; }
   </style>
 </head>
+
 <body>
 
-  <!-- Vanta background -->
+  <!-- Vanta Animated Background -->
   <div id="vanta-bg"></div>
 
-  <!-- Navigation -->
-  <nav aria-label="main navigation">
-    <a href="secdashboard.html">Dashboard</a>
-    <a href="README.md">Docs</a>
+  <!-- NAVBAR -->
+  <nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] max-w-6xl glass rounded-2xl px-6 py-3 flex justify-between items-center shadow-xl z-20">
+    <h1 class="text-xl font-bold gradient-text tracking-wide">RA SECURITY</h1>
+    <div class="flex gap-6 text-gray-300 font-semibold">
+      <a href="/" class="hover:text-white">Home</a>
+      <a href="ioc.html" class="hover:text-white">IOC Checker</a>
+      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="README.md" class="hover:text-white">Docs</a>
+    </div>
   </nav>
 
-  <!-- Hero -->
-  <main class="hero" role="main">
-    <div class="hero-panel" role="region" aria-label="hero">
-      <h1 class="title">MUSUH <span class="accent">TERLIHAT!</span></h1>
-      <p class="lead">Practice makes perfect!.</p>
-      <a class="cta" href="secdashboard.html">Open Security Dashboard →</a>
-    </div>
-  </main>
+  <!-- HERO SECTION -->
+  <section class="relative min-h-screen flex items-center">
+    <div class="max-w-5xl mx-auto px-8">
 
-  <!-- Some "below the fold" area so the Vanta shape can be seen -->
-  <section class="below" aria-hidden="true">
-    <!-- kosong: hanya untuk menampilkan bagian bawah shape -->
+      <div class="glass rounded-3xl p-12 shadow-2xl">
+
+        <h1 class="text-6xl md:text-7xl font-extrabold gradient-text leading-tight">
+          PROACTIVE <br> CYBER DEFENSE
+        </h1>
+
+        <p class="mt-4 text-xl text-gray-300 max-w-3xl">
+          Combining advanced human intelligence with next-gen AI threat detection.  
+          We hunt threats before they hunt you.
+        </p>
+
+        <div class="mt-8 flex gap-4">
+          <a href="ioc.html"
+            class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg">
+            Open IOC Intelligence →
+          </a>
+
+          <a href="secdashboard.html"
+            class="px-6 py-3 rounded-xl glass border border-gray-600 text-white hover:bg-white/10 font-semibold">
+            Security Dashboard →
+          </a>
+        </div>
+
+      </div>
+
+    </div>
   </section>
 
-  <!-- three.js + vanta.halo -->
+  <!-- FEATURE CARDS -->
+  <section class="py-20 px-8 max-w-6xl mx-auto">
+
+    <h2 class="text-4xl font-bold gradient-text mb-10 text-center">RA Security Ecosystem</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">IOC Intelligence</h3>
+        <p class="text-gray-400">Deep reputation analysis across VT, AbuseIPDB, OTX & MXToolbox.</p>
+      </div>
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">Threat Dashboard</h3>
+        <p class="text-gray-400">Monitor log sources, anomalies, and incident trends securely.</p>
+      </div>
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">AI-Assisted Defense</h3>
+        <p class="text-gray-400">Machine-learning powered enrichment and risk scoring.</p>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="mt-20 text-center text-gray-500 pb-10">
+    © 2025 RA Security — Proactive Cyber Defense
+  </footer>
+
+
+  <!-- Vanta Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://www.vantajs.com/dist/vanta.halo.min.js"></script>
+
   <script>
-    // Activate Vanta only on wider screens for performance
-    (function() {
-      var vantaInstance = null;
-      function startVanta(){
-        if (window.innerWidth <= 720) return;
-        if (vantaInstance) return;
-        vantaInstance = VANTA.HALO({
-          el: "#vanta-bg",
-          baseColor: 0xff66b6,      // neon-ish pink/rose (ubah sesuai preferensi)
-          backgroundColor: 0x07102a,// warna dasar
-          size: 1.45,               // lebih besar supaya menonjol
-          amplitude: 1.3,
-          amplitudeFactor: 1.0,
-          speed: 0.95,
-          xOffset: 0.0,
-          yOffset: -0.24,          // geser shape ke atas supaya terlihat di belakang hero
-          mouseControls: true,
-          touchControls: true,
-          gyroControls: false,
-          minHeight: 200.00,
-          minWidth: 200.00
-        });
-      }
-
-      // start after DOM ready
-      if (document.readyState === "complete" || document.readyState === "interactive") {
-        startVanta();
-      } else {
-        window.addEventListener('DOMContentLoaded', startVanta);
-      }
-
-      // re-init on resize (destroy and recreate) while avoiding thrash
-      var resizeTimeout;
-      window.addEventListener('resize', function(){
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(function(){
-          if (window.innerWidth <= 720 && vantaInstance) {
-            if (typeof vantaInstance.destroy === 'function') vantaInstance.destroy();
-            vantaInstance = null;
-          } else if (window.innerWidth > 720 && !vantaInstance) {
-            startVanta();
-          }
-        }, 200);
-      });
-    })();
+    VANTA.HALO({
+      el: "#vanta-bg",
+      baseColor: 0x133a86,
+      backgroundColor: 0x060a12,
+      amplitude: 1.2,
+      size: 1.1,
+      speed: 0.9,
+      mouseControls: true,
+      touchControls: true,
+    });
   </script>
 
 </body>
