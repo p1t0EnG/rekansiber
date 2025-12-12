@@ -1,0 +1,16 @@
+{
+  "name": "rasecurity-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.0",
+    "node-fetch": "^3.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
