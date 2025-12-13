@@ -1,3 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IOC Checker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background:#0b1220;
+      color:#e5e7eb;
+      font-family:system-ui;
+      padding:40px;
+    }
+    input, button {
+      padding:10px;
+      font-size:16px;
+    }
+    button {
+      background:#7c3aed;
+      color:white;
+      border:none;
+      cursor:pointer;
+    }
+    pre {
+      background:#020617;
+      padding:16px;
+      margin-top:20px;
+      border-radius:8px;
+    }
+    .error {
+      background:#7f1d1d;
+      padding:12px;
+      margin-top:20px;
+      display:none;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>IOC Intelligence</h1>
+
+<input id="iocInput" placeholder="8.8.8.8">
+<button onclick="runIOC()">Run IOC</button>
+
+<div id="errorBox" class="error"></div>
+<pre id="resultBox"></pre>
+
+
 <script>
 /* ================= CONFIG ================= */
 const API_ENDPOINT = "/api/ioc";
@@ -73,3 +122,5 @@ function renderHistory() {
   ).join("");
 }
 </script>
+</body>
+</html>
