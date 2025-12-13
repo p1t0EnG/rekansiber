@@ -1,3 +1,4 @@
+new1 ioc.js
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -9,30 +10,34 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ error: "IOC required" }), { status: 400 });
     }
 
-    /* =====================
+    /* ==========================
        VIRUSTOTAL
-    ===================== */
-    let vt = { malicious: 0, total: 0, verdict: "LOW", link: "" };
+    ========================== */
+    let vt = { malicious: 0, total: 0, verdict: "LOW" };
 
     try {
-      const res = await fetch(`https://www.virustotal.com/api/v3/ip_addresses/${ioc}`, {
-        headers: { "x-apikey": env.VT_KEY }
-      });
-      const j = await res.json();
-      const s = j.data.attributes.last_analysis_stats;
-      vt.malicious = s.malicious || 0;
-      vt.total = Object.values(s).reduce((a, b) => a + b, 0);
+      const vtRes = await fetch(
+        `https://www.virustotal.com/api/v3/ip_addresses/${ioc}`,
+        {
+          headers: {
+            "x-apikey": env.VT_KEY
+          }
+        }
+      );
+      const vtJson = await vtRes.json();
+      const stats = vtJson.data.attributes.last_analysis_stats;
+      vt.malicious = stats.malicious || 0;
+      vt.total = Object.values(stats).reduce((a, b) => a + b, 0);
       vt.verdict = vt.malicious >= 5 ? "HIGH" : vt.malicious > 0 ? "MEDIUM" : "LOW";
-      vt.link = `https://www.virustotal.com/gui/ip-address/${ioc}`;
-    } catch {}
+    } catch (_) {}
 
-    /* =====================
+    /* ==========================
        ABUSEIPDB
-    ===================== */
-    let abuse = { score: 0, verdict: "LOW", link: "" };
+    ========================== */
+    let abuse = { score: 0, verdict: "LOW" };
 
     try {
-      const res = await fetch(
+      const abuseRes = await fetch(
         `https://api.abuseipdb.com/api/v2/check?ipAddress=${ioc}&maxAgeInDays=90`,
         {
           headers: {
@@ -41,50 +46,42 @@ export async function onRequest(context) {
           }
         }
       );
-      const j = await res.json();
-      abuse.score = j.data.abuseConfidenceScore || 0;
+      const abuseJson = await abuseRes.json();
+      abuse.score = abuseJson.data.abuseConfidenceScore || 0;
       abuse.verdict = abuse.score >= 50 ? "HIGH" : abuse.score >= 10 ? "MEDIUM" : "LOW";
-      abuse.link = `https://www.abuseipdb.com/check/${ioc}`;
-    } catch {}
+    } catch (_) {}
 
-    /* =====================
-       OTX (FIXED & TAGS)
-    ===================== */
-    let otx = { pulses: 0, verdict: "LOW", tags: [], link: "" };
+    /* ==========================
+       ALIENVAULT OTX (FIXED)
+    ========================== */
+    let otx = { pulses: 0, verdict: "LOW" };
 
     try {
-      const res = await fetch(
+      const otxRes = await fetch(
         `https://otx.alienvault.com/api/v1/indicators/IPv4/${ioc}/general`,
-        { headers: { "X-OTX-API-KEY": env.OTX_KEY } }
+        {
+          headers: {
+            "X-OTX-API-KEY": env.OTX_KEY
+          }
+        }
       );
-      const j = await res.json();
-      otx.pulses = j.pulse_info?.count || 0;
-      otx.tags = [...new Set((j.pulse_info?.pulses || []).flatMap(p => p.tags || []))];
+      const otxJson = await otxRes.json();
+      otx.pulses = otxJson.pulse_info?.count || 0;
       otx.verdict = otx.pulses >= 20 ? "HIGH" : otx.pulses > 0 ? "MEDIUM" : "LOW";
-      otx.link = `https://otx.alienvault.com/indicator/ip/${ioc}`;
-    } catch {}
+    } catch (_) {}
 
-    /* =====================
-       MXTOOLBOX
-    ===================== */
-    let mxtoolbox = { listed: false, verdict: "LOW", link: "" };
-
-    try {
-      const res = await fetch(
-        `https://api.mxtoolbox.com/api/v1/lookup/ip/${ioc}`,
-        { headers: { Authorization: env.MXTOOLBOX_KEY } }
-      );
-      const j = await res.json();
-      mxtoolbox.listed = j.Failed && j.Failed.length > 0;
-      mxtoolbox.verdict = mxtoolbox.listed ? "HIGH" : "LOW";
-      mxtoolbox.link = `https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a${ioc}`;
-    } catch {}
-
+    /* ==========================
+       RESPONSE (NO FINAL VERDICT)
+    ========================== */
     return new Response(
       JSON.stringify({
         ioc,
         timestamp: new Date().toISOString(),
-        sources: { virustotal: vt, abuseipdb: abuse, otx, mxtoolbox }
+        sources: {
+          virustotal: vt,
+          abuseipdb: abuse,
+          otx: otx
+        }
       }),
       { headers: { "Content-Type": "application/json" } }
     );
