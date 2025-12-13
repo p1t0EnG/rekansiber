@@ -1,242 +1,176 @@
+new
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>IOC Intelligence Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-:root {
-  --bg: #05060f;
-  --card: #0b1220;
-  --accent: #8b5cf6;
-  --text: #e5e7eb;
-  --muted: #94a3b8;
-  --high: #ef4444;
-  --medium: #f59e0b;
-  --low: #22c55e;
+:root{
+  --bg:#020617;--panel:#0f172a;--border:#1e293b;
+  --purple:#7c3aed;--green:#22c55e;
+  --yellow:#f59e0b;--red:#ef4444;
+  --text:#e5e7eb;--muted:#94a3b8;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Inter,system-ui,sans-serif;
+  background:radial-gradient(circle at top,#020617,#000);
+  color:var(--text)
+}
+header{text-align:center;padding:60px 20px 30px}
+header h1{margin:0;font-size:34px;color:#a78bfa}
+header p{margin-top:8px;color:var(--muted)}
+
+.ioc-box{
+  max-width:760px;margin:40px auto;
+  background:linear-gradient(180deg,#0f172a,#020617);
+  border:1px solid var(--border);
+  border-radius:18px;padding:26px
+}
+.ioc-row{display:flex;gap:14px;margin-top:14px}
+.ioc-row input{
+  flex:1;padding:16px;border-radius:12px;
+  border:1px solid var(--border);
+  background:#020617;color:var(--text)
+}
+.ioc-row button{
+  padding:16px 28px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#7c3aed,#a78bfa);
+  color:#fff;font-weight:700;cursor:pointer
 }
 
-* { box-sizing: border-box; font-family: Inter, system-ui; }
-body {
-  margin: 0;
-  background: radial-gradient(circle at top, #0b1020, #05060f);
-  color: var(--text);
+#errorBox{
+  display:none;max-width:760px;margin:20px auto;
+  background:rgba(239,68,68,.15);
+  border:1px solid var(--red);
+  border-radius:12px;padding:14px;color:#fecaca
 }
 
-.container {
-  max-width: 900px;
-  margin: 60px auto;
-  padding: 0 20px;
-}
+#result{max-width:760px;margin:40px auto;display:none}
 
-h1 {
-  text-align: center;
-  font-size: 34px;
-  margin-bottom: 6px;
+.card{
+  background:linear-gradient(180deg,#0f172a,#020617);
+  border:1px solid var(--border);
+  border-radius:16px;padding:20px;margin-bottom:20px
 }
-.subtitle {
-  text-align: center;
-  color: var(--muted);
-  margin-bottom: 40px;
-}
+.card h3{margin:0 0 10px;font-size:18px}
 
-.card {
-  background: linear-gradient(180deg, #0f172a, #020617);
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 18px;
-  box-shadow: 0 20px 50px rgba(0,0,0,.6);
+.badge{
+  display:inline-block;padding:6px 14px;
+  border-radius:999px;font-weight:700;font-size:14px
 }
+.low{background:rgba(34,197,94,.15);color:var(--green)}
+.medium{background:rgba(245,158,11,.15);color:var(--yellow)}
+.high{background:rgba(239,68,68,.15);color:var(--red)}
 
-.input-row {
-  display: flex;
-  gap: 12px;
-}
+.score{font-size:28px;font-weight:800}
+.muted{color:var(--muted);font-size:14px}
 
-input {
-  flex: 1;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid #1e293b;
-  background: #020617;
-  color: white;
-  font-size: 15px;
-}
-
-button {
-  padding: 14px 22px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.tool {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.tool h3 { margin: 0; }
-
-.badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.high { background: rgba(239,68,68,.15); color: var(--high); }
-.medium { background: rgba(245,158,11,.15); color: var(--medium); }
-.low { background: rgba(34,197,94,.15); color: var(--low); }
-
-.value {
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.link {
-  color: var(--accent);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.tags {
-  margin-top: 10px;
-}
-.tag {
-  display: inline-block;
-  background: #020617;
-  border: 1px solid #1e293b;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  margin: 4px;
-}
-
-footer {
-  text-align: center;
-  color: var(--muted);
-  margin-top: 40px;
-}
+footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
 </style>
 </head>
 
 <body>
-<div class="container">
+
+<header>
   <h1>IOC Intelligence Dashboard</h1>
-  <div class="subtitle">VirusTotal · AbuseIPDB · AlienVault OTX · MXToolbox</div>
+  <p>VirusTotal · AbuseIPDB · OTX · MXToolbox</p>
+</header>
 
-  <div class="card">
-    <div class="input-row">
-      <input id="ioc" placeholder="Enter IP / Domain / Hash" />
-      <button id="run">Run IOC Check</button>
-    </div>
+<div class="ioc-box">
+  <label>Enter IOC</label>
+  <div class="ioc-row">
+    <input id="iocInput" placeholder="IP / Domain / Hash">
+    <button onclick="runIOC()">Run IOC Check</button>
   </div>
-
-  <div id="results"></div>
-
-  <footer>RA Security © 2025</footer>
 </div>
 
-<script>
-const btn = document.getElementById("run");
-const results = document.getElementById("results");
+<div id="errorBox"></div>
 
-btn.onclick = async () => {
-  const ioc = document.getElementById("ioc").value.trim();
-  if (!ioc) return;
+<div id="result">
 
-  btn.disabled = true;
-  results.innerHTML = `<div class="card">Analyzing ${ioc}…</div>`;
-
-  try {
-    const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`, {
-      cache: "no-store"
-    });
-
-    if (!res.ok) {
-      throw new Error("Backend error");
-    }
-
-    const d = await res.json();
-
-    results.innerHTML = `
-      ${vt(d, ioc)}
-      ${abuse(d, ioc)}
-      ${otx(d, ioc)}
-      ${mx(ioc)}
-    `;
-  } catch (err) {
-    console.error(err);
-    results.innerHTML = `
-      <div class="card">
-        <strong>Error:</strong> Failed to analyze IOC
-      </div>`;
-  } finally {
-    btn.disabled = false;   // 🔑 INI YANG SEBELUMNYA HILANG
-  }
-};
-
-const badge = l =>
-  `<span class="badge ${l.toLowerCase()}">${l}</span>`;
-
-const vt = (d, i) => `
-<div class="card">
-  <div class="tool">
+  <div class="card">
     <h3>VirusTotal</h3>
-    ${badge(d.vt.level)}
+    <span id="vtVerdict" class="badge"></span>
+    <div class="score" id="vtScore"></div>
+    <div class="muted">Malicious detections</div>
   </div>
-  <div class="value">${d.vt.malicious}/${d.vt.total}</div>
-  <a class="link" target="_blank"
-     href="https://www.virustotal.com/gui/ip-address/${i}">
-     View on VirusTotal ↗
-  </a>
-</div>`;
 
-const abuse = (d, i) => `
-<div class="card">
-  <div class="tool">
+  <div class="card">
     <h3>AbuseIPDB</h3>
-    ${badge(d.abuse.level)}
+    <span id="abuseVerdict" class="badge"></span>
+    <div class="score" id="abuseScore"></div>
+    <div class="muted">Abuse confidence score</div>
   </div>
-  <div class="value">${d.abuse.score}</div>
-  <a class="link" target="_blank"
-     href="https://www.abuseipdb.com/check/${i}">
-     View on AbuseIPDB ↗
-  </a>
-</div>`;
 
-const otx = (d, i) => `
-<div class="card">
-  <div class="tool">
+  <div class="card">
     <h3>AlienVault OTX</h3>
-    ${badge(d.otx.level)}
+    <span id="otxVerdict" class="badge"></span>
+    <div class="score" id="otxScore"></div>
+    <div class="muted">Pulse matches</div>
   </div>
-  <div class="value">${d.otx.pulses} pulses</div>
-  <div class="tags">
-    ${(d.otx.tags || []).map(t => `<span class="tag">${t}</span>`).join("")}
-  </div>
-  <a class="link" target="_blank"
-     href="https://otx.alienvault.com/indicator/ip/${i}">
-     View on OTX ↗
-  </a>
-</div>`;
 
-const mx = i => `
-<div class="card">
-  <div class="tool">
-    <h3>MXToolbox</h3>
-    ${badge("LOW")}
-  </div>
-  <div class="value">CHECK VIA WEB</div>
-  <a class="link" target="_blank"
-     href="https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a${i}">
-     View on MXToolbox ↗
-  </a>
-</div>`;
+</div>
+
+<footer>RA Security © 2025</footer>
+
+<script>
+const badge=(el,v)=>{
+  el.textContent=v
+  el.className="badge "+v.toLowerCase()
+}
+
+const vtVerdict=m=>m>=5?"HIGH":m>=1?"MEDIUM":"LOW"
+const abuseVerdict=s=>s>=75?"HIGH":s>=25?"MEDIUM":"LOW"
+const otxVerdict=p=>p>=3?"HIGH":p>=1?"MEDIUM":"LOW"
+
+async function runIOC(){
+  const ioc=document.getElementById("iocInput").value.trim()
+  const err=document.getElementById("errorBox")
+  const res=document.getElementById("result")
+  err.style.display="none";res.style.display="none"
+  if(!ioc) return showError("IOC is required")
+
+  try{
+    const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`)
+    if(!r.ok) throw new Error("API error")
+    const d=await r.json()
+
+    const src=d.sources||{}
+    const vt=src.virustotal||{malicious:0,total:0}
+    const ab=src.abuseipdb||{score:0}
+    const otx=src.otx||{pulses:0}
+
+    badge(vtVerdictEl,vtVerdict(vt.malicious))
+    vtScore.textContent=`${vt.malicious} / ${vt.total}`
+
+    badge(abuseVerdictEl,abuseVerdict(ab.score))
+    abuseScore.textContent=ab.score
+
+    badge(otxVerdictEl,otxVerdict(otx.pulses))
+    otxScore.textContent=otx.pulses
+
+    res.style.display="block"
+  }catch(e){
+    console.error(e)
+    showError("Failed to fetch IOC intelligence")
+  }
+}
+
+function showError(m){
+  errorBox.textContent=m
+  errorBox.style.display="block"
+}
+
+const vtVerdictEl=document.getElementById("vtVerdict")
+const vtScore=document.getElementById("vtScore")
+const abuseVerdictEl=document.getElementById("abuseVerdict")
+const abuseScore=document.getElementById("abuseScore")
+const otxVerdictEl=document.getElementById("otxVerdict")
+const otxScore=document.getElementById("otxScore")
 </script>
+
 </body>
 </html>
