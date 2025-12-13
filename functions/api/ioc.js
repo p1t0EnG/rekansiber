@@ -1,4 +1,3 @@
-new1 ioc.js
 export async function onRequest(context) {
   const { request, env } = context;
 
