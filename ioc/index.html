@@ -6,20 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-:root {
-  --bg:#020617; --panel:#0f172a; --border:#1e293b;
-  --purple:#7c3aed; --green:#22c55e;
-  --yellow:#f59e0b; --red:#ef4444;
-  --text:#e5e7eb; --muted:#94a3b8;
+:root{
+  --bg:#020617;--panel:#0f172a;--border:#1e293b;
+  --purple:#7c3aed;--green:#22c55e;
+  --yellow:#f59e0b;--red:#ef4444;
+  --text:#e5e7eb;--muted:#94a3b8;
 }
-
 *{box-sizing:border-box}
 body{
   margin:0;font-family:Inter,system-ui,sans-serif;
   background:radial-gradient(circle at top,#020617,#000);
   color:var(--text)
 }
-
 header{text-align:center;padding:60px 20px 30px}
 header h1{margin:0;font-size:36px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
@@ -97,7 +95,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <h3>VirusTotal</h3>
     <span id="vtVerdict" class="badge"></span>
     <div class="score" id="vtScore"></div>
-    <div class="muted" id="vtDetail"></div>
+    <div class="muted">Malicious detections</div>
   </div>
 
   <!-- ABUSEIPDB -->
@@ -108,65 +106,62 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <div class="muted">Abuse confidence score</div>
   </div>
 
+  <!-- OTX -->
+  <div class="card">
+    <h3>AlienVault OTX</h3>
+    <span id="otxVerdict" class="badge"></span>
+    <div class="score" id="otxScore"></div>
+    <div class="muted">Pulse matches</div>
+  </div>
+
 </div>
 
 <footer>RA Security © 2025</footer>
 
 <script>
-function verdictClass(v){return v.toLowerCase()}
-function vtVerdict(m){
-  if(m>=5) return "HIGH"
-  if(m>=1) return "MEDIUM"
-  return "LOW"
+function badge(el,v){
+  el.textContent=v;
+  el.className="badge "+v.toLowerCase()
 }
-function abuseVerdict(s){
-  if(s>=75) return "HIGH"
-  if(s>=25) return "MEDIUM"
-  return "LOW"
-}
+
+function vtVerdict(m){return m>=5?"HIGH":m>=1?"MEDIUM":"LOW"}
+function abuseVerdict(s){return s>=75?"HIGH":s>=25?"MEDIUM":"LOW"}
+function otxVerdict(p){return p>=3?"HIGH":p>=1?"MEDIUM":"LOW"}
 
 async function runIOC(){
   const ioc=document.getElementById("iocInput").value.trim()
-  const error=document.getElementById("errorBox")
-  const result=document.getElementById("result")
-  error.style.display="none"; result.style.display="none"
+  const err=document.getElementById("errorBox")
+  const resBox=document.getElementById("result")
+  err.style.display="none";resBox.style.display="none"
   if(!ioc){showError("IOC is required");return}
 
   try{
-    const res=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`)
-    if(!res.ok) throw new Error()
-    const d=await res.json()
+    const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`)
+    if(!r.ok) throw 0
+    const d=await r.json()
 
-    /* VirusTotal */
+    /* VT */
     const vtM=d.sources.virustotal.malicious
     const vtT=d.sources.virustotal.total
-    const vtV=vtVerdict(vtM)
-    vtVerdictEl(vtV)
+    badge(document.getElementById("vtVerdict"),vtVerdict(vtM))
     document.getElementById("vtScore").textContent=`${vtM} / ${vtT}`
-    document.getElementById("vtDetail").textContent="Malicious detections"
 
     /* AbuseIPDB */
     const ab=d.sources.abuseipdb.score
-    const abV=abuseVerdict(ab)
-    abuseVerdictEl(abV)
+    badge(document.getElementById("abuseVerdict"),abuseVerdict(ab))
     document.getElementById("abuseScore").textContent=ab
 
-    result.style.display="block"
+    /* OTX */
+    const otx=d.sources.otx.pulses
+    badge(document.getElementById("otxVerdict"),otxVerdict(otx))
+    document.getElementById("otxScore").textContent=otx
+
+    resBox.style.display="block"
   }catch{
     showError("Failed to fetch IOC intelligence")
   }
 }
 
-function vtVerdictEl(v){
-  const el=document.getElementById("vtVerdict")
-  el.textContent=v
-  el.className=`badge ${verdictClass(v)}`
-}
-function abuseVerdictEl(v){
-  const el=document.getElementById("abuseVerdict")
-  el.textContent=v
-  el.className=`badge ${verdictClass(v)}`
-}
 function showError(m){
   const b=document.getElementById("errorBox")
   b.textContent=m;b.style.display="block"
