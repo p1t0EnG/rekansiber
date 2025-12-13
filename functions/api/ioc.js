@@ -1,29 +1,20 @@
-export async function onRequest(context) {
+export async function onRequestGet({ request }) {
   try {
-    const { request, env } = context;
     const url = new URL(request.url);
     const ioc = url.searchParams.get("ioc");
 
     if (!ioc) {
       return new Response(
         JSON.stringify({ error: "IOC parameter is required" }),
-        { status: 400 }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // ===== SAFETY CHECK (BIAR TIDAK 500) =====
-    if (!env.VT_API_KEY || !env.ABUSEIPDB_API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: "API keys not configured",
-          hint: "Check Cloudflare Pages → Settings → Variables"
-        }),
-        { status: 500 }
-      );
-    }
-
-    // ===== MOCK RESPONSE (BIAR FRONTEND JALAN DULU) =====
-    // NANTI BARU KITA AKTIFKAN VT / OTX / MX
+    /**
+     * === MOCK RESPONSE (AMAN, STABIL, TIDAK PAKAI API DULU) ===
+     * Kita pastikan frontend + routing + history + verdict engine JALAN
+     * API eksternal kita sambungkan SETELAH ini stabil
+     */
     const response = {
       ioc,
       verdict: "CLEAN",
@@ -36,9 +27,9 @@ export async function onRequest(context) {
         mxtoolbox: { blacklisted: false }
       },
       explanation: {
-        summary: "IOC not detected as malicious by any intelligence source.",
+        summary: "IOC is not detected as malicious by any intelligence source.",
         details: [
-          "VirusTotal reports 0 detections",
+          "VirusTotal: 0/94 detections",
           "AbuseIPDB score is 0",
           "No OTX pulses found",
           "MXToolbox shows no blacklist"
@@ -47,6 +38,7 @@ export async function onRequest(context) {
     };
 
     return new Response(JSON.stringify(response), {
+      status: 200,
       headers: { "Content-Type": "application/json" }
     });
 
@@ -56,7 +48,7 @@ export async function onRequest(context) {
         error: "Unhandled backend error",
         message: err.message
       }),
-      { status: 500 }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }
