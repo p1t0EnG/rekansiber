@@ -1,39 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>IOC Checker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      background:#0b1220;
-      color:#e5e7eb;
-      font-family:system-ui;
-      padding:40px;
-    }
-    input, button {
-      padding:10px;
-      font-size:16px;
-    }
-    button {
-      background:#7c3aed;
-      color:white;
-      border:none;
-      cursor:pointer;
-    }
-    pre {
-      background:#020617;
-      padding:16px;
-      margin-top:20px;
-      border-radius:8px;
-    }
-    .error {
-      background:#7f1d1d;
-      padding:12px;
-      margin-top:20px;
-      display:none;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>IOC Intelligence</title>
+<style>
+  body {
+    background: #0b1220;
+    color: #e5e7eb;
+    font-family: system-ui, sans-serif;
+    padding: 40px;
+  }
+  h1 { margin-bottom: 20px; }
+  input {
+    padding: 10px;
+    width: 300px;
+  }
+  button {
+    padding: 10px 16px;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .card {
+    margin-top: 20px;
+    background: #111827;
+    padding: 20px;
+    border-radius: 8px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: bold;
+  }
+  .CLEAN { background: #065f46; }
+  .LOW { background: #92400e; }
+  .MEDIUM { background: #9f1239; }
+  .HIGH { background: #7f1d1d; }
+  .error {
+    background: #7f1d1d;
+    padding: 10px;
+    margin-top: 15px;
+  }
+</style>
 </head>
 
 <body>
@@ -43,38 +53,55 @@
 <input id="iocInput" placeholder="8.8.8.8">
 <button onclick="runIOC()">Run IOC</button>
 
-<div id="errorBox" class="error"></div>
-<pre id="resultBox"></pre>
+<div id="error" class="error" style="display:none"></div>
+
+<div id="result" class="card" style="display:none">
+  <h3>Verdict:
+    <span id="verdict" class="badge"></span>
+  </h3>
+  <p id="confidence"></p>
+  <p id="summary"></p>
+
+  <h4>Sources</h4>
+  <ul id="sources"></ul>
+</div>
 
 <script>
 async function runIOC() {
   const ioc = document.getElementById("iocInput").value.trim();
-  const errorBox = document.getElementById("errorBox");
-  const resultBox = document.getElementById("resultBox");
+  if (!ioc) return;
 
-  errorBox.style.display = "none";
-  resultBox.textContent = "";
-
-  if (!ioc) {
-    showError("IOC required");
-    return;
-  }
+  document.getElementById("error").style.display = "none";
 
   try {
     const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
     if (!res.ok) throw new Error("API error");
 
     const data = await res.json();
-    resultBox.textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    showError("Failed to fetch IOC intelligence");
-  }
-}
 
-function showError(msg) {
-  const box = document.getElementById("errorBox");
-  box.textContent = msg;
-  box.style.display = "block";
+    document.getElementById("result").style.display = "block";
+
+    const verdictEl = document.getElementById("verdict");
+    verdictEl.textContent = data.verdict;
+    verdictEl.className = `badge ${data.verdict}`;
+
+    document.getElementById("confidence").textContent =
+      `Confidence: ${data.confidence}`;
+
+    document.getElementById("summary").textContent =
+      data.explanation.summary;
+
+    document.getElementById("sources").innerHTML = `
+      <li>VirusTotal: ${data.sources.virustotal.malicious}/${data.sources.virustotal.total}</li>
+      <li>AbuseIPDB score: ${data.sources.abuseipdb.score}</li>
+      <li>OTX pulses: ${data.sources.otx.pulses}</li>
+      <li>MXToolbox blacklist: ${data.sources.mxtoolbox.blacklisted}</li>
+    `;
+  } catch (e) {
+    document.getElementById("error").textContent =
+      "Failed to fetch IOC intelligence";
+    document.getElementById("error").style.display = "block";
+  }
 }
 </script>
 
