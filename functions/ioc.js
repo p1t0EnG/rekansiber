@@ -12,22 +12,22 @@ export async function onRequest(context) {
   try {
     const results = {};
 
-    // === VirusTotal ===
+    // VirusTotal
     if (env.VT_KEY) {
       results.virustotal = await queryVirusTotal(ioc, type, env.VT_KEY);
     }
 
-    // === AbuseIPDB (IP only) ===
+    // AbuseIPDB (IP only)
     if (type === "ip" && env.ABUSEIPDB_KEY) {
       results.abuseipdb = await queryAbuseIPDB(ioc, env.ABUSEIPDB_KEY);
     }
 
-    // === AlienVault OTX ===
+    // AlienVault OTX
     if (env.OTX_KEY) {
       results.otx = await queryOTX(ioc, type, env.OTX_KEY);
     }
 
-    // === MXToolbox (domain only) ===
+    // MXToolbox (domain only)
     if (type === "domain" && env.MXTOOLBOX_KEY) {
       results.mxtoolbox = await queryMXToolbox(ioc, env.MXTOOLBOX_KEY);
     }
@@ -52,8 +52,7 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*"
+      "Content-Type": "application/json"
     }
   });
 }
@@ -78,7 +77,7 @@ async function queryVirusTotal(ioc, type, key) {
     { headers: { "x-apikey": key } }
   );
 
-  return res.ok ? res.json() : { error: "VirusTotal error" };
+  return res.ok ? await res.json() : { error: "VirusTotal error" };
 }
 
 async function queryAbuseIPDB(ip, key) {
@@ -91,7 +90,8 @@ async function queryAbuseIPDB(ip, key) {
       }
     }
   );
-  return res.ok ? res.json() : { error: "AbuseIPDB error" };
+
+  return res.ok ? await res.json() : { error: "AbuseIPDB error" };
 }
 
 async function queryOTX(ioc, type, key) {
@@ -102,3 +102,18 @@ async function queryOTX(ioc, type, key) {
   };
 
   const res = await fetch(
+    `https://otx.alienvault.com/api/v1/indicators/${map[type]}`,
+    { headers: { "X-OTX-API-KEY": key } }
+  );
+
+  return res.ok ? await res.json() : { error: "OTX error" };
+}
+
+async function queryMXToolbox(domain, key) {
+  const res = await fetch(
+    `https://api.mxtoolbox.com/api/v1/lookup/dns/${domain}`,
+    { headers: { Authorization: key } }
+  );
+
+  return res.ok ? await res.json() : { error: "MXToolbox error" };
+}
