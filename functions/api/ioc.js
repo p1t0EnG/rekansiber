@@ -1,4 +1,5 @@
-export async function onRequestGet({ request, env }) {
+export async function onRequest(context) {
+  const { request, env } = context;
   const url = new URL(request.url);
   const ioc = url.searchParams.get("ioc");
 
@@ -8,30 +9,78 @@ export async function onRequestGet({ request, env }) {
 
   const type = detectIOCType(ioc);
 
-  const results = {
-    virustotal: null,
-    abuseipdb: null,
-    otx: null,
-    mxtoolbox: null
-  };
+  // === FETCH RAW DATA (placeholder – sudah kamu punya / mock dulu) ===
+  const vt = await fetchVirusTotal(ioc, type, env);
+  const abuse = await fetchAbuseIPDB(ioc, env);
+  const otx = await fetchOTX(ioc, env);
+  const mx = await fetchMXToolbox(ioc, type, env);
 
-  // Parallel enrichment
-  await Promise.all([
-    fetchVirusTotal(ioc, type, env).then(r => results.virustotal = r),
-    fetchAbuseIPDB(ioc, type, env).then(r => results.abuseipdb = r),
-    fetchOTX(ioc, type, env).then(r => results.otx = r),
-    fetchMXToolbox(ioc, type, env).then(r => results.mxtoolbox = r)
-  ]);
+  // === NORMALIZATION (STRICT) ===
+  const normalized = {
+    virustotal: normalizeVT(vt.malicious || 0, vt.total || 90),
+    abuseipdb: normalizeAbuse(abuse.score || 0, abuse.reports || 0),
+    otx: normalizeOTX(otx.pulses || 0),
+    mxtoolbox: normalizeMX(mx.blacklisted || false)
+  };
 
   return json({
     ioc,
     type,
     timestamp: new Date().toISOString(),
-    results
+    raw: { vt, abuse, otx, mx },
+    normalized
   });
 }
 
-/* ================= HELPERS ================= */
+/* =======================
+   NORMALIZATION FUNCTIONS
+   ======================= */
+
+function normalizeVT(malicious, total = 90) {
+  if (malicious <= 1) return 0;
+  if (malicious <= 10) return 25;
+  if (malicious <= 25) return 50;
+  if (malicious <= 50) return 75;
+  return 100;
+}
+
+function normalizeAbuse(score, reports) {
+  let base;
+  if (score === 0) base = 0;
+  else if (score <= 10) base = 25;
+  else if (score <= 30) base = 50;
+  else if (score <= 60) base = 75;
+  else base = 100;
+
+  // escalation
+  if (score > 0 && reports >= 10) {
+    base = Math.min(base + 25, 100);
+  }
+
+  return base;
+}
+
+function normalizeOTX(pulses) {
+  if (pulses === 0) return 0;
+  if (pulses <= 3) return 25;
+  if (pulses <= 10) return 50;
+  if (pulses <= 25) return 75;
+  return 100;
+}
+
+function normalizeMX(blacklisted) {
+  return blacklisted ? 50 : 0;
+}
+
+/* =======================
+   HELPERS
+   ======================= */
+
+function detectIOCType(ioc) {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
+  if (/^[a-fA-F0-9]{32,64}$/.test(ioc)) return "hash";
+  return "domain";
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -43,66 +92,23 @@ function json(data, status = 200) {
   });
 }
 
-function detectIOCType(ioc) {
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
-  if (/^[a-f0-9]{32,64}$/i.test(ioc)) return "hash";
-  return "domain";
-}
-
-/* ================= PROVIDERS ================= */
+/* =======================
+   MOCK FETCHERS (AMAN)
+   Ganti dengan real API nanti
+   ======================= */
 
 async function fetchVirusTotal(ioc, type, env) {
-  if (!env.VT_API_KEY) return { error: "VT key missing" };
-
-  const map = { ip: "ip_addresses", domain: "domains", hash: "files" };
-  const url = `https://www.virustotal.com/api/v3/${map[type]}/${ioc}`;
-
-  try {
-    const res = await fetch(url, {
-      headers: { "x-apikey": env.VT_API_KEY }
-    });
-    return await res.json();
-  } catch (e) {
-    return { error: e.message };
-  }
+  return { malicious: 0, total: 90 };
 }
 
-async function fetchAbuseIPDB(ioc, type, env) {
-  if (type !== "ip") return { skipped: "Not IP" };
-  if (!env.ABUSEIPDB_API_KEY) return { error: "AbuseIPDB key missing" };
-
-  const url = `https://api.abuseipdb.com/api/v2/check?ipAddress=${ioc}&maxAgeInDays=90`;
-
-  try {
-    const res = await fetch(url, {
-      headers: {
-        Key: env.ABUSEIPDB_API_KEY,
-        Accept: "application/json"
-      }
-    });
-    return await res.json();
-  } catch (e) {
-    return { error: e.message };
-  }
+async function fetchAbuseIPDB(ioc, env) {
+  return { score: 0, reports: 0 };
 }
 
-async function fetchOTX(ioc, type, env) {
-  if (!env.OTX_API_KEY) return { error: "OTX key missing" };
-
-  const base = "https://otx.alienvault.com/api/v1/indicators";
-  const map = { ip: "IPv4", domain: "domain", hash: "file" };
-  const url = `${base}/${map[type]}/${ioc}/general`;
-
-  try {
-    const res = await fetch(url, {
-      headers: { "X-OTX-API-KEY": env.OTX_API_KEY }
-    });
-    return await res.json();
-  } catch (e) {
-    return { error: e.message };
-  }
+async function fetchOTX(ioc, env) {
+  return { pulses: 0 };
 }
 
 async function fetchMXToolbox(ioc, type, env) {
-  return { info: "MXToolbox integration placeholder" };
+  return { blacklisted: false };
 }
