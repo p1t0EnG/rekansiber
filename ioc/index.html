@@ -5,6 +5,15 @@
 <title>IOC Intelligence Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Favicon -->
+  <link rel="icon" href="/images/favicon.ico">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind (for premium UI styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
 <style>
 :root{
   --bg:#020617;--panel:#0f172a;--border:#1e293b;
@@ -18,7 +27,22 @@ body{
   background:radial-gradient(circle at top,#020617,#000);
   color:var(--text)
 }
-header{text-align:center;padding:60px 20px 30px}
+
+ /* Glass effect for panel */
+    .glass {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+      /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(90deg, #7b5cff, #ff5fb6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  
+header{text-align:center;padding:150px 20px 30px}
 header h1{margin:0;font-size:34px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
 
