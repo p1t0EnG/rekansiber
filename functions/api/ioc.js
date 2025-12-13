@@ -1,5 +1,4 @@
-export async function onRequest(context) {
-  const { request, env } = context;
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const ioc = url.searchParams.get("ioc");
 
@@ -9,111 +8,101 @@ export async function onRequest(context) {
 
   const type = detectIOCType(ioc);
 
-  try {
-    const results = {};
+  const results = {
+    virustotal: null,
+    abuseipdb: null,
+    otx: null,
+    mxtoolbox: null
+  };
 
-    // VirusTotal
-    if (env.VT_KEY) {
-      results.virustotal = await queryVirusTotal(ioc, type, env.VT_KEY);
-    }
+  // Parallel enrichment
+  await Promise.all([
+    fetchVirusTotal(ioc, type, env).then(r => results.virustotal = r),
+    fetchAbuseIPDB(ioc, type, env).then(r => results.abuseipdb = r),
+    fetchOTX(ioc, type, env).then(r => results.otx = r),
+    fetchMXToolbox(ioc, type, env).then(r => results.mxtoolbox = r)
+  ]);
 
-    // AbuseIPDB (IP only)
-    if (type === "ip" && env.ABUSEIPDB_KEY) {
-      results.abuseipdb = await queryAbuseIPDB(ioc, env.ABUSEIPDB_KEY);
-    }
-
-    // AlienVault OTX
-    if (env.OTX_KEY) {
-      results.otx = await queryOTX(ioc, type, env.OTX_KEY);
-    }
-
-    // MXToolbox (domain only)
-    if (type === "domain" && env.MXTOOLBOX_KEY) {
-      results.mxtoolbox = await queryMXToolbox(ioc, env.MXTOOLBOX_KEY);
-    }
-
-    return json({
-      ioc,
-      type,
-      timestamp: new Date().toISOString(),
-      results
-    });
-
-  } catch (err) {
-    return json({ error: err.message }, 500);
-  }
+  return json({
+    ioc,
+    type,
+    timestamp: new Date().toISOString(),
+    results
+  });
 }
 
-/* =========================
-   Helper Functions
-========================= */
+/* ================= HELPERS ================= */
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
     }
   });
 }
 
 function detectIOCType(ioc) {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
-  if (/^[a-fA-F0-9]{32,64}$/.test(ioc)) return "hash";
+  if (/^[a-f0-9]{32,64}$/i.test(ioc)) return "hash";
   return "domain";
 }
 
-/* === API Calls === */
+/* ================= PROVIDERS ================= */
 
-async function queryVirusTotal(ioc, type, key) {
-  const map = {
-    ip: `ip_addresses/${ioc}`,
-    domain: `domains/${ioc}`,
-    hash: `files/${ioc}`
-  };
+async function fetchVirusTotal(ioc, type, env) {
+  if (!env.VT_API_KEY) return { error: "VT key missing" };
 
-  const res = await fetch(
-    `https://www.virustotal.com/api/v3/${map[type]}`,
-    { headers: { "x-apikey": key } }
-  );
+  const map = { ip: "ip_addresses", domain: "domains", hash: "files" };
+  const url = `https://www.virustotal.com/api/v3/${map[type]}/${ioc}`;
 
-  return res.ok ? await res.json() : { error: "VirusTotal error" };
+  try {
+    const res = await fetch(url, {
+      headers: { "x-apikey": env.VT_API_KEY }
+    });
+    return await res.json();
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
-async function queryAbuseIPDB(ip, key) {
-  const res = await fetch(
-    `https://api.abuseipdb.com/api/v2/check?ipAddress=${ip}&maxAgeInDays=90`,
-    {
+async function fetchAbuseIPDB(ioc, type, env) {
+  if (type !== "ip") return { skipped: "Not IP" };
+  if (!env.ABUSEIPDB_API_KEY) return { error: "AbuseIPDB key missing" };
+
+  const url = `https://api.abuseipdb.com/api/v2/check?ipAddress=${ioc}&maxAgeInDays=90`;
+
+  try {
+    const res = await fetch(url, {
       headers: {
-        Key: key,
+        Key: env.ABUSEIPDB_API_KEY,
         Accept: "application/json"
       }
-    }
-  );
-
-  return res.ok ? await res.json() : { error: "AbuseIPDB error" };
+    });
+    return await res.json();
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
-async function queryOTX(ioc, type, key) {
-  const map = {
-    ip: `IPv4/${ioc}/general`,
-    domain: `domain/${ioc}/general`,
-    hash: `file/${ioc}/general`
-  };
+async function fetchOTX(ioc, type, env) {
+  if (!env.OTX_API_KEY) return { error: "OTX key missing" };
 
-  const res = await fetch(
-    `https://otx.alienvault.com/api/v1/indicators/${map[type]}`,
-    { headers: { "X-OTX-API-KEY": key } }
-  );
+  const base = "https://otx.alienvault.com/api/v1/indicators";
+  const map = { ip: "IPv4", domain: "domain", hash: "file" };
+  const url = `${base}/${map[type]}/${ioc}/general`;
 
-  return res.ok ? await res.json() : { error: "OTX error" };
+  try {
+    const res = await fetch(url, {
+      headers: { "X-OTX-API-KEY": env.OTX_API_KEY }
+    });
+    return await res.json();
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
-async function queryMXToolbox(domain, key) {
-  const res = await fetch(
-    `https://api.mxtoolbox.com/api/v1/lookup/dns/${domain}`,
-    { headers: { Authorization: key } }
-  );
-
-  return res.ok ? await res.json() : { error: "MXToolbox error" };
+async function fetchMXToolbox(ioc, type, env) {
+  return { info: "MXToolbox integration placeholder" };
 }
