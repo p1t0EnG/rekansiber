@@ -1,118 +1,139 @@
-export async function onRequest({ request, env }) {
+export async function onRequest(context) {
+  const { request, env } = context;
   const url = new URL(request.url);
   const ioc = url.searchParams.get("ioc");
 
-  if (!ioc) return json({ error: "IOC is required" }, 400);
+  if (!ioc) {
+    return json({ error: "IOC parameter is required" }, 400);
+  }
 
   const type = detectIOCType(ioc);
 
-  // === MOCK DATA (AMAN, STABIL) ===
-  const vt = { malicious: 2, total: 90 };
-  const abuse = { score: 5, reports: 3 };
-  const otx = { pulses: 0 };
-  const mx = { blacklisted: false };
+  if (type !== "ip") {
+    return json({ error: "Only IP IOC supported for now" }, 400);
+  }
 
-  // === NORMALIZATION ===
-  const normalized = {
-    virustotal: normalizeVT(vt.malicious),
-    abuseipdb: normalizeAbuse(abuse.score, abuse.reports),
-    otx: normalizeOTX(otx.pulses),
-    mxtoolbox: normalizeMX(mx.blacklisted)
-  };
+  try {
+    const vt = await queryVirusTotal(ioc, env.VT_API_KEY);
+    const abuse = await queryAbuseIPDB(ioc, env.ABUSE_API_KEY);
 
-  // === FUSION SCORE ===
-  const score = Math.round(
-    normalized.virustotal * 0.4 +
-    normalized.abuseipdb * 0.3 +
-    normalized.otx * 0.2 +
-    normalized.mxtoolbox * 0.1
-  );
+    const verdictData = verdictEngine(vt, abuse);
+    const confidence = confidenceEngine(vt, abuse);
+    const explanation = explanationEngine(vt, abuse, verdictData.verdict);
 
-  // === VERDICT ===
-  const verdict = finalVerdict(score);
+    return json({
+      ioc,
+      type,
+      sources: {
+        virustotal: vt,
+        abuseipdb: abuse
+      },
+      verdict: verdictData.verdict,
+      risk_score: verdictData.score,
+      confidence,
+      explanation,
+      timestamp: new Date().toISOString()
+    });
 
-  // === CONFIDENCE ===
-  const confidence = calculateConfidence(vt, abuse, otx, mx);
-
-  // === EXPLANATION ===
-  const explanation = {
-    summary: `IOC diklasifikasikan sebagai ${verdict} berdasarkan korelasi multi-source threat intelligence`,
-    details: [
-      vt.malicious > 0
-        ? `VirusTotal mendeteksi ${vt.malicious}/${vt.total} vendor`
-        : "VirusTotal tidak mendeteksi malicious activity",
-      abuse.score > 0
-        ? `AbuseIPDB mencatat abuse score ${abuse.score}% (${abuse.reports} laporan)`
-        : "AbuseIPDB tidak mencatat abuse",
-      otx.pulses > 0
-        ? `OTX menemukan ${otx.pulses} pulse`
-        : "OTX tidak menemukan pulse",
-      mx.blacklisted
-        ? "MXToolbox mendeteksi blacklist"
-        : "MXToolbox tidak mendeteksi blacklist"
-    ]
-  };
-
-  return json({
-    ioc,
-    type,
-    verdict,
-    confidence,
-    score,
-    normalized,
-    explanation,
-    timestamp: new Date().toISOString()
-  });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
 }
 
-/* ================= HELPERS ================= */
+/* ---------------- HELPERS ---------------- */
 
 function detectIOCType(ioc) {
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
-  if (/^[a-fA-F0-9]{32,64}$/.test(ioc)) return "hash";
-  return "domain";
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ioc) ? "ip" : "unknown";
 }
 
-function normalizeVT(m) {
-  if (m <= 1) return 0;
-  if (m <= 10) return 25;
-  if (m <= 25) return 50;
-  if (m <= 50) return 75;
-  return 100;
+/* ----------- VIRUSTOTAL ----------- */
+async function queryVirusTotal(ip, apiKey) {
+  const res = await fetch(`https://www.virustotal.com/api/v3/ip_addresses/${ip}`, {
+    headers: { "x-apikey": apiKey }
+  });
+
+  const data = await res.json();
+  const stats = data.data.attributes.last_analysis_stats;
+
+  return {
+    malicious: stats.malicious,
+    suspicious: stats.suspicious,
+    harmless: stats.harmless,
+    reputation: data.data.attributes.reputation
+  };
 }
 
-function normalizeAbuse(score, reports) {
-  let base = score === 0 ? 0 : score <= 10 ? 25 : score <= 30 ? 50 : score <= 60 ? 75 : 100;
-  if (score > 0 && reports >= 10) base = Math.min(base + 25, 100);
-  return base;
+/* ----------- ABUSEIPDB ----------- */
+async function queryAbuseIPDB(ip, apiKey) {
+  const res = await fetch(
+    `https://api.abuseipdb.com/api/v2/check?ipAddress=${ip}&maxAgeInDays=90`,
+    {
+      headers: {
+        Key: apiKey,
+        Accept: "application/json"
+      }
+    }
+  );
+
+  const data = await res.json();
+  const d = data.data;
+
+  return {
+    abuseScore: d.abuseConfidenceScore,
+    reports: d.totalReports,
+    country: d.countryCode
+  };
 }
 
-function normalizeOTX(p) {
-  return p === 0 ? 0 : p <= 3 ? 25 : p <= 10 ? 50 : p <= 25 ? 75 : 100;
+/* ----------- VERDICT ENGINE ----------- */
+function verdictEngine(vt, abuse) {
+  const vtDetections = vt.malicious + vt.suspicious;
+  let score = 0;
+  let verdict = "CLEAN";
+
+  // VirusTotal strict rules
+  if (vtDetections === 0) score += 0;
+  else if (vtDetections === 1) score += 10;
+  else if (vtDetections <= 10) score += 30;
+  else if (vtDetections <= 25) score += 60;
+  else score += 90;
+
+  // AbuseIPDB strict rules
+  if (abuse.abuseScore === 0) score += 0;
+  else if (abuse.abuseScore <= 25) score += 20;
+  else if (abuse.abuseScore <= 50) score += 40;
+  else score += 70;
+
+  if (score >= 80) verdict = "MALICIOUS";
+  else if (score >= 40) verdict = "SUSPICIOUS";
+  else verdict = "CLEAN";
+
+  return { verdict, score };
 }
 
-function normalizeMX(b) {
-  return b ? 50 : 0;
+/* ----------- CONFIDENCE ENGINE ----------- */
+function confidenceEngine(vt, abuse) {
+  if (vt.harmless > 70 && abuse.abuseScore === 0) return "HIGH";
+  if (vt.harmless > 40) return "MEDIUM";
+  return "LOW";
 }
 
-function finalVerdict(score) {
-  if (score === 0) return "CLEAN";
-  if (score <= 25) return "LOW RISK";
-  if (score <= 50) return "SUSPICIOUS";
-  if (score <= 75) return "HIGH RISK";
-  return "MALICIOUS";
+/* ----------- EXPLANATION ENGINE ----------- */
+function explanationEngine(vt, abuse, verdict) {
+  const reasons = [];
+
+  reasons.push(
+    `${vt.malicious + vt.suspicious}/${vt.malicious + vt.suspicious + vt.harmless} VirusTotal engines flagged this IP`
+  );
+
+  reasons.push(`AbuseIPDB confidence score is ${abuse.abuseScore}`);
+
+  reasons.push(`Final verdict classified as ${verdict}`);
+
+  return reasons;
 }
 
-function calculateConfidence(vt, abuse, otx, mx) {
-  let signals = 0;
-  if (vt.malicious > 0) signals++;
-  if (abuse.score > 0) signals++;
-  if (otx.pulses > 0) signals++;
-  if (mx.blacklisted) signals++;
-
-  return signals >= 3 ? "HIGH" : signals === 2 ? "MEDIUM" : "LOW";
-}
-
+/* ----------- RESPONSE HELPER ----------- */
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
