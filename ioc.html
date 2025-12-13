@@ -1,32 +1,57 @@
 <script>
+/* ================= CONFIG ================= */
+const API_ENDPOINT = "/api/ioc";
+
+/* ================= MAIN ================= */
 async function runIOC() {
   const ioc = document.getElementById("iocInput").value.trim();
-  if (!ioc) return alert("IOC required");
+  if (!ioc) {
+    alert("IOC required");
+    return;
+  }
 
-  const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`${API_ENDPOINT}?ioc=${encodeURIComponent(ioc)}`);
+    if (!res.ok) throw new Error("API error");
 
-  // Verdict Badge
-  document.getElementById("verdictBadge").textContent = data.verdict;
-  document.getElementById("confidenceBadge").textContent = "Confidence: " + data.confidence;
+    const data = await res.json();
 
-  // Explanation
-  document.getElementById("explanationSummary").textContent = data.explanation.summary;
-  document.getElementById("explanationList").innerHTML =
-    data.explanation.details.map(d => `<li>${d}</li>`).join("");
+    // Verdict
+    document.getElementById("verdictBadge").textContent = data.verdict;
+    document.getElementById("confidenceBadge").textContent =
+      `Confidence: ${data.confidence}`;
 
-  // History
-  saveHistory({
-    ioc: data.ioc,
-    verdict: data.verdict,
-    confidence: data.confidence,
-    time: data.timestamp
-  });
+    // Explanation
+    document.getElementById("explanationSummary").textContent =
+      data.explanation.summary;
 
-  renderHistory();
+    document.getElementById("explanationList").innerHTML =
+      data.explanation.details.map(d => `<li>${d}</li>`).join("");
+
+    // History
+    saveHistory({
+      ioc: data.ioc,
+      verdict: data.verdict,
+      confidence: data.confidence,
+      time: data.timestamp
+    });
+
+    renderHistory();
+
+  } catch (err) {
+    console.error(err);
+    showError("Failed to fetch IOC intelligence");
+  }
 }
 
-/* ===== HISTORY ===== */
+/* ================= ERROR ================= */
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  box.textContent = msg;
+  box.style.display = "block";
+}
+
+/* ================= HISTORY ================= */
 function saveHistory(entry) {
   const h = JSON.parse(localStorage.getItem("ioc_history") || "[]");
   h.unshift(entry);
@@ -35,13 +60,16 @@ function saveHistory(entry) {
 
 function renderHistory() {
   const h = JSON.parse(localStorage.getItem("ioc_history") || "[]");
-  document.getElementById("iocHistory").innerHTML = h.map(e => `
-    <div class="p-2 bg-slate-800 rounded">
-      <div>${e.ioc}</div>
-      <div class="text-sm">${e.verdict} (${e.confidence})</div>
-    </div>
-  `).join("");
-}
+  const el = document.getElementById("historyList");
+  if (!el) return;
 
-document.addEventListener("DOMContentLoaded", renderHistory);
+  el.innerHTML = h.map(e =>
+    `<tr>
+      <td>${e.ioc}</td>
+      <td>${e.verdict}</td>
+      <td>${e.confidence}</td>
+      <td>${new Date(e.time).toLocaleString()}</td>
+    </tr>`
+  ).join("");
+}
 </script>
