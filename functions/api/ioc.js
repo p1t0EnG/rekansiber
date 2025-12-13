@@ -1,146 +1,105 @@
 export async function onRequest(context) {
-  const { request, env } = context;
-
   try {
+    const { request, env } = context;
     const url = new URL(request.url);
     const ioc = url.searchParams.get("ioc");
 
     if (!ioc) {
-      return new Response(
-        JSON.stringify({ error: "IOC parameter is required" }),
-        { status: 400 }
-      );
+      return new Response(JSON.stringify({ error: "IOC is required" }), { status: 400 });
     }
 
-    /* =============================
-       VIRUSTOTAL (STEP B)
-    ============================== */
-    let vtMalicious = 0;
-    let vtTotal = 0;
-
-    if (env.VT_KEY) {
-      const vtRes = await fetch(
-        `https://www.virustotal.com/api/v3/ip_addresses/${ioc}`,
-        {
-          headers: {
-            "x-apikey": env.VT_KEY
-          }
-        }
-      );
-
-      if (vtRes.ok) {
-        const vtJson = await vtRes.json();
-        const stats =
-          vtJson?.data?.attributes?.last_analysis_stats || {};
-
-        vtMalicious = stats.malicious || 0;
-        vtTotal = Object.values(stats).reduce(
-          (a, b) => a + b,
-          0
-        );
+    /* =========================
+       VIRUSTOTAL
+    ========================= */
+    const vtRes = await fetch(
+      `https://www.virustotal.com/api/v3/ip_addresses/${ioc}`,
+      {
+        headers: { "x-apikey": env.VT_KEY }
       }
-    }
+    );
+    const vtJson = vtRes.ok ? await vtRes.json() : null;
 
-    function verdictFromVT(malicious) {
-      if (malicious <= 1) return "CLEAN";
-      if (malicious <= 10) return "LOW";
-      if (malicious <= 30) return "MEDIUM";
-      return "HIGH";
-    }
+    const vtMalicious =
+      vtJson?.data?.attributes?.last_analysis_stats?.malicious || 0;
+    const vtTotal =
+      Object.values(
+        vtJson?.data?.attributes?.last_analysis_stats || {}
+      ).reduce((a, b) => a + b, 0);
 
-    const vtVerdict = verdictFromVT(vtMalicious);
-
-    /* =============================
-       ABUSEIPDB (STEP C)
-    ============================== */
-    let abuseScore = 0;
-
-    if (env.ABUSEIPDB_KEY) {
-      const abuseRes = await fetch(
-        `https://api.abuseipdb.com/api/v2/check?ipAddress=${ioc}&maxAgeInDays=90`,
-        {
-          headers: {
-            Key: env.ABUSEIPDB_KEY,
-            Accept: "application/json"
-          }
+    /* =========================
+       ABUSEIPDB
+    ========================= */
+    const abuseRes = await fetch(
+      `https://api.abuseipdb.com/api/v2/check?ipAddress=${ioc}&maxAgeInDays=90`,
+      {
+        headers: {
+          Key: env.ABUSEIPDB_KEY,
+          Accept: "application/json"
         }
-      );
-
-      if (abuseRes.ok) {
-        const abuseJson = await abuseRes.json();
-        abuseScore =
-          abuseJson?.data?.abuseConfidenceScore || 0;
       }
-    }
+    );
+    const abuseJson = abuseRes.ok ? await abuseRes.json() : null;
+    const abuseScore = abuseJson?.data?.abuseConfidenceScore ?? 0;
 
-    function verdictFromAbuse(score) {
-      if (score === 0) return "CLEAN";
-      if (score <= 10) return "LOW";
-      if (score <= 40) return "MEDIUM";
-      return "HIGH";
-    }
+    /* =========================
+       OTX (FIXED — PULSE COUNT)
+    ========================= */
+    const otxRes = await fetch(
+      `https://otx.alienvault.com/api/v1/indicators/IPv4/${ioc}/general`,
+      {
+        headers: {
+          "X-OTX-API-KEY": env.OTX_KEY
+        }
+      }
+    );
+    const otxJson = otxRes.ok ? await otxRes.json() : null;
+    const otxPulses = otxJson?.pulse_info?.count ?? 0;
 
-    const abuseVerdict = verdictFromAbuse(abuseScore);
+    /* =========================
+       VERDICT PER TOOL
+    ========================= */
+    const vtVerdict =
+      vtMalicious >= 10 ? "HIGH" :
+      vtMalicious >= 3  ? "MEDIUM" : "LOW";
 
-    /* =============================
-       FINAL FUSION VERDICT
-    ============================== */
-    const verdicts = [vtVerdict, abuseVerdict];
+    const abuseVerdict =
+      abuseScore >= 80 ? "HIGH" :
+      abuseScore >= 30 ? "MEDIUM" : "LOW";
 
-    const finalVerdict = verdicts.includes("HIGH")
-      ? "HIGH"
-      : verdicts.includes("MEDIUM")
-      ? "MEDIUM"
-      : verdicts.includes("LOW")
-      ? "LOW"
-      : "CLEAN";
+    const otxVerdict =
+      otxPulses >= 20 ? "HIGH" :
+      otxPulses >= 5  ? "MEDIUM" : "LOW";
 
-    const confidence =
-      finalVerdict === "CLEAN"
-        ? "HIGH"
-        : finalVerdict === "LOW"
-        ? "MEDIUM"
-        : "HIGH";
-
-    /* =============================
+    /* =========================
        FINAL RESPONSE
-    ============================== */
-    const response = {
+    ========================= */
+    return new Response(JSON.stringify({
       ioc,
-      verdict: finalVerdict,
-      confidence,
       timestamp: new Date().toISOString(),
-      sources: {
-        virustotal: {
-          malicious: vtMalicious,
-          total: vtTotal
-        },
-        abuseipdb: {
-          score: abuseScore
-        }
-      },
-      explanation: {
-        summary:
-          finalVerdict === "CLEAN"
-            ? "IOC not detected as malicious by VirusTotal or AbuseIPDB."
-            : "IOC shows risk indicators from threat intelligence sources.",
-        details: [
-          `VirusTotal: ${vtMalicious}/${vtTotal} detections`,
-          `AbuseIPDB score: ${abuseScore}`
-        ]
-      }
-    };
 
-    return new Response(JSON.stringify(response, null, 2), {
+      virustotal: {
+        verdict: vtVerdict,
+        malicious: vtMalicious,
+        total: vtTotal
+      },
+
+      abuseipdb: {
+        verdict: abuseVerdict,
+        score: abuseScore
+      },
+
+      otx: {
+        verdict: otxVerdict,
+        pulses: otxPulses
+      }
+    }), {
       headers: { "Content-Type": "application/json" }
     });
+
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: "Unhandled backend error",
-        message: err.message
-      }),
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({
+      error: "Backend error",
+      message: err.message
+    }), { status: 500 });
   }
 }
