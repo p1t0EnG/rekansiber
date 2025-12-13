@@ -3,7 +3,7 @@ async function runIOC() {
   const ioc = document.getElementById("iocInput").value.trim();
   if (!ioc) return alert("IOC required");
 
-  const res = await fetch(`/ioc?ioc=${encodeURIComponent(ioc)}`);
+  const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
   const data = await res.json();
 
   // Verdict Badge
