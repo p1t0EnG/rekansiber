@@ -79,9 +79,7 @@ button {
   align-items: center;
 }
 
-.tool h3 {
-  margin: 0;
-}
+.tool h3 { margin: 0; }
 
 .badge {
   padding: 6px 12px;
@@ -117,6 +115,7 @@ button {
   font-size: 12px;
   margin: 4px;
 }
+
 footer {
   text-align: center;
   color: var(--muted);
@@ -133,7 +132,7 @@ footer {
   <div class="card">
     <div class="input-row">
       <input id="ioc" placeholder="Enter IP / Domain / Hash" />
-      <button onclick="run()">Run IOC Check</button>
+      <button id="run">Run IOC Check</button>
     </div>
   </div>
 
@@ -143,23 +142,43 @@ footer {
 </div>
 
 <script>
-async function run() {
-  const ioc = document.getElementById('ioc').value.trim();
+const btn = document.getElementById("run");
+const results = document.getElementById("results");
+
+btn.onclick = async () => {
+  const ioc = document.getElementById("ioc").value.trim();
   if (!ioc) return;
 
-  const r = document.getElementById('results');
-  r.innerHTML = `<div class="card">Analyzing ${ioc}…</div>`;
+  btn.disabled = true;
+  results.innerHTML = `<div class="card">Analyzing ${ioc}…</div>`;
 
-  const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
-  const d = await res.json();
+  try {
+    const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`, {
+      cache: "no-store"
+    });
 
-  r.innerHTML = `
-  ${vt(d, ioc)}
-  ${abuse(d, ioc)}
-  ${otx(d, ioc)}
-  ${mx(ioc)}
-  `;
-}
+    if (!res.ok) {
+      throw new Error("Backend error");
+    }
+
+    const d = await res.json();
+
+    results.innerHTML = `
+      ${vt(d, ioc)}
+      ${abuse(d, ioc)}
+      ${otx(d, ioc)}
+      ${mx(ioc)}
+    `;
+  } catch (err) {
+    console.error(err);
+    results.innerHTML = `
+      <div class="card">
+        <strong>Error:</strong> Failed to analyze IOC
+      </div>`;
+  } finally {
+    btn.disabled = false;   // 🔑 INI YANG SEBELUMNYA HILANG
+  }
+};
 
 const badge = l =>
   `<span class="badge ${l.toLowerCase()}">${l}</span>`;
@@ -198,7 +217,7 @@ const otx = (d, i) => `
   </div>
   <div class="value">${d.otx.pulses} pulses</div>
   <div class="tags">
-    ${d.otx.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+    ${(d.otx.tags || []).map(t => `<span class="tag">${t}</span>`).join("")}
   </div>
   <a class="link" target="_blank"
      href="https://otx.alienvault.com/indicator/ip/${i}">
@@ -210,7 +229,7 @@ const mx = i => `
 <div class="card">
   <div class="tool">
     <h3>MXToolbox</h3>
-    ${badge('LOW')}
+    ${badge("LOW")}
   </div>
   <div class="value">CHECK VIA WEB</div>
   <a class="link" target="_blank"
