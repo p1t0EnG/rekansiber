@@ -46,81 +46,37 @@
 <div id="errorBox" class="error"></div>
 <pre id="resultBox"></pre>
 
-
 <script>
-/* ================= CONFIG ================= */
-const API_ENDPOINT = "/api/ioc";
-
-/* ================= MAIN ================= */
 async function runIOC() {
   const ioc = document.getElementById("iocInput").value.trim();
+  const errorBox = document.getElementById("errorBox");
+  const resultBox = document.getElementById("resultBox");
+
+  errorBox.style.display = "none";
+  resultBox.textContent = "";
+
   if (!ioc) {
-    alert("IOC required");
+    showError("IOC required");
     return;
   }
 
   try {
-    const res = await fetch(`${API_ENDPOINT}?ioc=${encodeURIComponent(ioc)}`);
+    const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
     if (!res.ok) throw new Error("API error");
 
     const data = await res.json();
-
-    // Verdict
-    document.getElementById("verdictBadge").textContent = data.verdict;
-    document.getElementById("confidenceBadge").textContent =
-      `Confidence: ${data.confidence}`;
-
-    // Explanation
-    document.getElementById("explanationSummary").textContent =
-      data.explanation.summary;
-
-    document.getElementById("explanationList").innerHTML =
-      data.explanation.details.map(d => `<li>${d}</li>`).join("");
-
-    // History
-    saveHistory({
-      ioc: data.ioc,
-      verdict: data.verdict,
-      confidence: data.confidence,
-      time: data.timestamp
-    });
-
-    renderHistory();
-
-  } catch (err) {
-    console.error(err);
+    resultBox.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
     showError("Failed to fetch IOC intelligence");
   }
 }
 
-/* ================= ERROR ================= */
 function showError(msg) {
   const box = document.getElementById("errorBox");
   box.textContent = msg;
   box.style.display = "block";
 }
-
-/* ================= HISTORY ================= */
-function saveHistory(entry) {
-  const h = JSON.parse(localStorage.getItem("ioc_history") || "[]");
-  h.unshift(entry);
-  localStorage.setItem("ioc_history", JSON.stringify(h.slice(0, 20)));
-}
-
-function renderHistory() {
-  const h = JSON.parse(localStorage.getItem("ioc_history") || "[]");
-  const el = document.getElementById("historyList");
-  if (!el) return;
-
-  el.innerHTML = h.map(e =>
-    `<tr>
-      <td>${e.ioc}</td>
-      <td>${e.verdict}</td>
-      <td>${e.confidence}</td>
-      <td>${new Date(e.time).toLocaleString()}</td>
-    </tr>`
-  ).join("");
-}
 </script>
+
 </body>
 </html>
