@@ -1,80 +1,71 @@
-export async function onRequest(context) {
-  const { request, env } = context;
+export async function onRequest({ request, env }) {
   const url = new URL(request.url);
   const ioc = url.searchParams.get("ioc");
 
-  if (!ioc) {
-    return json({ error: "IOC parameter is required" }, 400);
-  }
+  if (!ioc) return json({ error: "IOC is required" }, 400);
 
   const type = detectIOCType(ioc);
 
-  // === FETCH RAW DATA (placeholder – sudah kamu punya / mock dulu) ===
-  const vt = await fetchVirusTotal(ioc, type, env);
-  const abuse = await fetchAbuseIPDB(ioc, env);
-  const otx = await fetchOTX(ioc, env);
-  const mx = await fetchMXToolbox(ioc, type, env);
+  // === MOCK DATA (AMAN, STABIL) ===
+  const vt = { malicious: 2, total: 90 };
+  const abuse = { score: 5, reports: 3 };
+  const otx = { pulses: 0 };
+  const mx = { blacklisted: false };
 
-  // === NORMALIZATION (STRICT) ===
+  // === NORMALIZATION ===
   const normalized = {
-    virustotal: normalizeVT(vt.malicious || 0, vt.total || 90),
-    abuseipdb: normalizeAbuse(abuse.score || 0, abuse.reports || 0),
-    otx: normalizeOTX(otx.pulses || 0),
-    mxtoolbox: normalizeMX(mx.blacklisted || false)
+    virustotal: normalizeVT(vt.malicious),
+    abuseipdb: normalizeAbuse(abuse.score, abuse.reports),
+    otx: normalizeOTX(otx.pulses),
+    mxtoolbox: normalizeMX(mx.blacklisted)
+  };
+
+  // === FUSION SCORE ===
+  const score = Math.round(
+    normalized.virustotal * 0.4 +
+    normalized.abuseipdb * 0.3 +
+    normalized.otx * 0.2 +
+    normalized.mxtoolbox * 0.1
+  );
+
+  // === VERDICT ===
+  const verdict = finalVerdict(score);
+
+  // === CONFIDENCE ===
+  const confidence = calculateConfidence(vt, abuse, otx, mx);
+
+  // === EXPLANATION ===
+  const explanation = {
+    summary: `IOC diklasifikasikan sebagai ${verdict} berdasarkan korelasi multi-source threat intelligence`,
+    details: [
+      vt.malicious > 0
+        ? `VirusTotal mendeteksi ${vt.malicious}/${vt.total} vendor`
+        : "VirusTotal tidak mendeteksi malicious activity",
+      abuse.score > 0
+        ? `AbuseIPDB mencatat abuse score ${abuse.score}% (${abuse.reports} laporan)`
+        : "AbuseIPDB tidak mencatat abuse",
+      otx.pulses > 0
+        ? `OTX menemukan ${otx.pulses} pulse`
+        : "OTX tidak menemukan pulse",
+      mx.blacklisted
+        ? "MXToolbox mendeteksi blacklist"
+        : "MXToolbox tidak mendeteksi blacklist"
+    ]
   };
 
   return json({
     ioc,
     type,
-    timestamp: new Date().toISOString(),
-    raw: { vt, abuse, otx, mx },
-    normalized
+    verdict,
+    confidence,
+    score,
+    normalized,
+    explanation,
+    timestamp: new Date().toISOString()
   });
 }
 
-/* =======================
-   NORMALIZATION FUNCTIONS
-   ======================= */
-
-function normalizeVT(malicious, total = 90) {
-  if (malicious <= 1) return 0;
-  if (malicious <= 10) return 25;
-  if (malicious <= 25) return 50;
-  if (malicious <= 50) return 75;
-  return 100;
-}
-
-function normalizeAbuse(score, reports) {
-  let base;
-  if (score === 0) base = 0;
-  else if (score <= 10) base = 25;
-  else if (score <= 30) base = 50;
-  else if (score <= 60) base = 75;
-  else base = 100;
-
-  // escalation
-  if (score > 0 && reports >= 10) {
-    base = Math.min(base + 25, 100);
-  }
-
-  return base;
-}
-
-function normalizeOTX(pulses) {
-  if (pulses === 0) return 0;
-  if (pulses <= 3) return 25;
-  if (pulses <= 10) return 50;
-  if (pulses <= 25) return 75;
-  return 100;
-}
-
-function normalizeMX(blacklisted) {
-  return blacklisted ? 50 : 0;
-}
-
-/* =======================
-   HELPERS
-   ======================= */
+/* ================= HELPERS ================= */
 
 function detectIOCType(ioc) {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ioc)) return "ip";
@@ -82,33 +73,49 @@ function detectIOCType(ioc) {
   return "domain";
 }
 
+function normalizeVT(m) {
+  if (m <= 1) return 0;
+  if (m <= 10) return 25;
+  if (m <= 25) return 50;
+  if (m <= 50) return 75;
+  return 100;
+}
+
+function normalizeAbuse(score, reports) {
+  let base = score === 0 ? 0 : score <= 10 ? 25 : score <= 30 ? 50 : score <= 60 ? 75 : 100;
+  if (score > 0 && reports >= 10) base = Math.min(base + 25, 100);
+  return base;
+}
+
+function normalizeOTX(p) {
+  return p === 0 ? 0 : p <= 3 ? 25 : p <= 10 ? 50 : p <= 25 ? 75 : 100;
+}
+
+function normalizeMX(b) {
+  return b ? 50 : 0;
+}
+
+function finalVerdict(score) {
+  if (score === 0) return "CLEAN";
+  if (score <= 25) return "LOW RISK";
+  if (score <= 50) return "SUSPICIOUS";
+  if (score <= 75) return "HIGH RISK";
+  return "MALICIOUS";
+}
+
+function calculateConfidence(vt, abuse, otx, mx) {
+  let signals = 0;
+  if (vt.malicious > 0) signals++;
+  if (abuse.score > 0) signals++;
+  if (otx.pulses > 0) signals++;
+  if (mx.blacklisted) signals++;
+
+  return signals >= 3 ? "HIGH" : signals === 2 ? "MEDIUM" : "LOW";
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*"
-    }
+    headers: { "Content-Type": "application/json" }
   });
-}
-
-/* =======================
-   MOCK FETCHERS (AMAN)
-   Ganti dengan real API nanti
-   ======================= */
-
-async function fetchVirusTotal(ioc, type, env) {
-  return { malicious: 0, total: 90 };
-}
-
-async function fetchAbuseIPDB(ioc, env) {
-  return { score: 0, reports: 0 };
-}
-
-async function fetchOTX(ioc, env) {
-  return { pulses: 0 };
-}
-
-async function fetchMXToolbox(ioc, type, env) {
-  return { blacklisted: false };
 }
