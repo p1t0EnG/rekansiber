@@ -19,7 +19,7 @@ body{
   color:var(--text)
 }
 header{text-align:center;padding:60px 20px 30px}
-header h1{margin:0;font-size:36px;color:#a78bfa}
+header h1{margin:0;font-size:34px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
 
 .ioc-box{
@@ -90,7 +90,6 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
 
 <div id="result">
 
-  <!-- VIRUSTOTAL -->
   <div class="card">
     <h3>VirusTotal</h3>
     <span id="vtVerdict" class="badge"></span>
@@ -98,7 +97,6 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <div class="muted">Malicious detections</div>
   </div>
 
-  <!-- ABUSEIPDB -->
   <div class="card">
     <h3>AbuseIPDB</h3>
     <span id="abuseVerdict" class="badge"></span>
@@ -106,7 +104,6 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <div class="muted">Abuse confidence score</div>
   </div>
 
-  <!-- OTX -->
   <div class="card">
     <h3>AlienVault OTX</h3>
     <span id="otxVerdict" class="badge"></span>
@@ -119,53 +116,59 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
 <footer>RA Security © 2025</footer>
 
 <script>
-function badge(el,v){
-  el.textContent=v;
+const badge=(el,v)=>{
+  el.textContent=v
   el.className="badge "+v.toLowerCase()
 }
 
-function vtVerdict(m){return m>=5?"HIGH":m>=1?"MEDIUM":"LOW"}
-function abuseVerdict(s){return s>=75?"HIGH":s>=25?"MEDIUM":"LOW"}
-function otxVerdict(p){return p>=3?"HIGH":p>=1?"MEDIUM":"LOW"}
+const vtVerdict=m=>m>=5?"HIGH":m>=1?"MEDIUM":"LOW"
+const abuseVerdict=s=>s>=75?"HIGH":s>=25?"MEDIUM":"LOW"
+const otxVerdict=p=>p>=3?"HIGH":p>=1?"MEDIUM":"LOW"
 
 async function runIOC(){
   const ioc=document.getElementById("iocInput").value.trim()
   const err=document.getElementById("errorBox")
-  const resBox=document.getElementById("result")
-  err.style.display="none";resBox.style.display="none"
-  if(!ioc){showError("IOC is required");return}
+  const res=document.getElementById("result")
+  err.style.display="none";res.style.display="none"
+  if(!ioc) return showError("IOC is required")
 
   try{
     const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`)
-    if(!r.ok) throw 0
+    if(!r.ok) throw new Error("API error")
     const d=await r.json()
 
-    /* VT */
-    const vtM=d.sources.virustotal.malicious
-    const vtT=d.sources.virustotal.total
-    badge(document.getElementById("vtVerdict"),vtVerdict(vtM))
-    document.getElementById("vtScore").textContent=`${vtM} / ${vtT}`
+    const src=d.sources||{}
+    const vt=src.virustotal||{malicious:0,total:0}
+    const ab=src.abuseipdb||{score:0}
+    const otx=src.otx||{pulses:0}
 
-    /* AbuseIPDB */
-    const ab=d.sources.abuseipdb.score
-    badge(document.getElementById("abuseVerdict"),abuseVerdict(ab))
-    document.getElementById("abuseScore").textContent=ab
+    badge(vtVerdictEl,vtVerdict(vt.malicious))
+    vtScore.textContent=`${vt.malicious} / ${vt.total}`
 
-    /* OTX */
-    const otx=d.sources.otx.pulses
-    badge(document.getElementById("otxVerdict"),otxVerdict(otx))
-    document.getElementById("otxScore").textContent=otx
+    badge(abuseVerdictEl,abuseVerdict(ab.score))
+    abuseScore.textContent=ab.score
 
-    resBox.style.display="block"
-  }catch{
+    badge(otxVerdictEl,otxVerdict(otx.pulses))
+    otxScore.textContent=otx.pulses
+
+    res.style.display="block"
+  }catch(e){
+    console.error(e)
     showError("Failed to fetch IOC intelligence")
   }
 }
 
 function showError(m){
-  const b=document.getElementById("errorBox")
-  b.textContent=m;b.style.display="block"
+  errorBox.textContent=m
+  errorBox.style.display="block"
 }
+
+const vtVerdictEl=document.getElementById("vtVerdict")
+const vtScore=document.getElementById("vtScore")
+const abuseVerdictEl=document.getElementById("abuseVerdict")
+const abuseScore=document.getElementById("abuseScore")
+const otxVerdictEl=document.getElementById("otxVerdict")
+const otxScore=document.getElementById("otxScore")
 </script>
 
 </body>
