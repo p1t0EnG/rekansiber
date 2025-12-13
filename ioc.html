@@ -120,7 +120,7 @@ async function runCheck() {
   iocTypeLabel.textContent = "";
 
   try {
-    const res = await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
+    const res = await fetch(`/functions/ioc?ioc=${encodeURIComponent(ioc)}`);
     const data = await res.json();
     resultData = data;
 
