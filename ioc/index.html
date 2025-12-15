@@ -175,6 +175,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <span id="vtVerdict" class="badge"></span>
     <div class="score" id="vtScore"></div>
     <div class="muted">Malicious detections</div>
+     <a id="vtLink" class="source-link" target="_blank">
+      View on VirusTotal ↗
   </div>
 
   <div class="card">
@@ -182,6 +184,8 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <span id="abuseVerdict" class="badge"></span>
     <div class="score" id="abuseScore"></div>
     <div class="muted">Abuse confidence score</div>
+     <a id="abuseLink" class="source-link" target="_blank">
+      View on AbuseIPDB ↗
   </div>
 
   <div class="card">
@@ -223,18 +227,30 @@ async function runIOC(){
     const src=d.sources||{}
     const vt=src.virustotal||{malicious:0,total:0}
     const ab=src.abuseipdb||{score:0}
-    const otx=src.otx||{pulses:0}
+    const otx=src.otx||{pulses:0, tags: []}
 
     badge(vtVerdictEl,vtVerdict(vt.malicious))
     vtScore.textContent=`${vt.malicious} / ${vt.total}`
+    vtLink.href = `https://www.virustotal.com/gui/ip-address/${ioc}`;
 
     badge(abuseVerdictEl,abuseVerdict(ab.score))
     abuseScore.textContent=ab.score
+    abuseLink.href = `https://www.abuseipdb.com/check/${ioc}`;
 
     badge(otxVerdictEl,otxVerdict(otx.pulses))
     otxScore.textContent=otx.pulses
+    // ===============================
+    // NORMALISASI TAG OTX
+    // ===============================
+    let tags = []
+      if (Array.isArray(otx.tags)) {
+        tags = otx.tags
+          } else if (typeof otx.tags === "string") {
+            tags = otx.tags.split(/\s+/) // pecah berdasarkan spasi
+          }
+
     otxTags.innerHTML = (otx.tags || [])
-    .slice(0, 20) // biar ga kepanjangan
+    .slice(0, 40) // biar ga kepanjangan
     .map(t => `<span class="otx-tag">${t}</span>`)
     .join("")
     otxLink.href=`https://otx.alienvault.com/indicator/ip/${ioc}`
