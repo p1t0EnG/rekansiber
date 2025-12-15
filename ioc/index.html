@@ -67,7 +67,7 @@
 
   
   body{background:#050814;color:#fff;font-family:Inter,Arial}
-// .card{background:#0b1220;border-radius:14px;padding:60px;margin:16px auto;max-width:620px}
+.card{background:#0b1220;border-radius:14px;padding:60px;margin:16px auto;max-width:620px}
 .badge{padding:4px 10px;border-radius:999px;font-size:12px}
 .HIGH{background:#7f1d1d}.MEDIUM{background:#92400e}.LOW{background:#064e3b}
 a{color:#8b5cf6;text-decoration:none}
@@ -91,7 +91,7 @@ a{color:#8b5cf6;text-decoration:none}
   <label>Enter IOC</label>
   <div class="ioc-row">
     <input id="iocInput" placeholder="IP / Domain / Hash">
-    <button onclick="runIOC()">Run IOC Check</button>
+    <button onclick="run()">Run IOC Check</button>
   </div>
 </div>
 
@@ -104,7 +104,7 @@ function saveHistory(ioc){
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
-async function runIOC(){
+async function run(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
   saveHistory(ioc);
