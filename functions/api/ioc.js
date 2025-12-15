@@ -64,11 +64,27 @@ export async function onRequest(context) {
       otx.link = `https://otx.alienvault.com/indicator/ip/${ioc}`;
     } catch {}
 
+    /* =====================
+       MXTOOLBOX
+    ===================== */
+    let mxtoolbox = { listed: false, verdict: "LOW", link: "" };
+
+    try {
+      const res = await fetch(
+        `https://api.mxtoolbox.com/api/v1/lookup/ip/${ioc}`,
+        { headers: { Authorization: env.MXTOOLBOX_KEY } }
+      );
+      const j = await res.json();
+      mxtoolbox.listed = j.Failed && j.Failed.length > 0;
+      mxtoolbox.verdict = mxtoolbox.listed ? "HIGH" : "LOW";
+      mxtoolbox.link = `https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a${ioc}`;
+    } catch {}
+
     return new Response(
       JSON.stringify({
         ioc,
         timestamp: new Date().toISOString(),
-        sources: { virustotal: vt, abuseipdb: abuse, otx }
+        sources: { virustotal: vt, abuseipdb: abuse, otx, mxtoolbox }
       }),
       { headers: { "Content-Type": "application/json" } }
     );
