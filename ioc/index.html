@@ -90,7 +90,7 @@ a{color:#8b5cf6;text-decoration:none}
 <div class="ioc-box">
   <label>Enter IOC</label>
   <div class="ioc-row">
-    <input id="iocInput" placeholder="IP / Domain / Hash">
+    <input id="ioc" placeholder="IP / Domain / Hash">
     <button onclick="run()">Run IOC Check</button>
   </div>
 </div>
@@ -98,16 +98,16 @@ a{color:#8b5cf6;text-decoration:none}
 <div id="result"></div>
 
 <script>
-function saveHistory(iocInput){
+function saveHistory(ioc){
   let h=JSON.parse(localStorage.getItem("ioc_history")||"[]");
-  h=h.filter(x=>x!==iocInput); h.unshift(iocInput);
+  h=h.filter(x=>x!==ioc); h.unshift(ioc);
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
 async function run(){
-  const iocInput=document.getElementById("iocInput").value.trim();
-  if(!iocInput) return;
-  saveHistory(iocInput);
+  const ioc=document.getElementById("ioc").value.trim();
+  if(!ioc) return;
+  saveHistory(ioc);
 
   const r=await fetch(`/api/ioc?ioc=${ioc}`);
   const d=await r.json();
