@@ -233,7 +233,10 @@ async function runIOC(){
 
     badge(otxVerdictEl,otxVerdict(otx.pulses))
     otxScore.textContent=otx.pulses
-    otxTags.innerHTML=otx.tags.map(t=>`<span class="tag">${t}</span>`).join("")
+    otxTags.innerHTML = (otx.tags || [])
+    .slice(0, 20) // biar ga kepanjangan
+    .map(t => `<span class="otx-tag">${t}</span>`)
+    .join("")
     otxLink.href=`https://otx.alienvault.com/indicator/ip/${ioc}`
 
     res.style.display="block"
