@@ -199,40 +199,63 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
 
 <footer>RA Security © 2025</footer>
 
-<script>
-function saveHistory(ioc){
-  let h=JSON.parse(localStorage.getItem("ioc_history")||"[]");
-  h=h.filter(x=>x!==ioc); h.unshift(ioc);
-  localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
+const badge=(el,v)=>{
+  el.textContent=v
+  el.className="badge "+v.toLowerCase()
 }
 
-async function run(){
-  const ioc=document.getElementById("ioc").value.trim();
-  if(!ioc) return;
-  saveHistory(ioc);
+const vtVerdict=m=>m>=5?"HIGH":m>=1?"MEDIUM":"LOW"
+const abuseVerdict=s=>s>=75?"HIGH":s>=25?"MEDIUM":"LOW"
+const otxVerdict=p=>p>=3?"HIGH":p>=1?"MEDIUM":"LOW"
 
-  const r=await fetch(`/api/ioc?ioc=${ioc}`);
-  const d=await r.json();
+async function runIOC(){
+  const ioc=document.getElementById("iocInput").value.trim()
+  const err=document.getElementById("errorBox")
+  const res=document.getElementById("result")
+  err.style.display="none";res.style.display="none"
+  if(!ioc) return showError("IOC is required")
 
-  const s=d.sources;
-  document.getElementById("result").innerHTML=`
-  ${block("VirusTotal",s.virustotal.verdict,`${s.virustotal.malicious}/${s.virustotal.total}`,s.virustotal.link)}
-  ${block("AbuseIPDB",s.abuseipdb.verdict,s.abuseipdb.score,s.abuseipdb.link)}
-  ${block("AlienVault OTX",s.otx.verdict,s.otx.pulses+" pulses",s.otx.link,
-    s.otx.tags.map(t=>`<span class="tag">${t}</span>`).join(""))}
-  ${block("MXToolbox",s.mxtoolbox.verdict,s.mxtoolbox.listed?"LISTED":"CLEAN",s.mxtoolbox.link)}
-  `;
+  try{
+    const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`)
+    if(!r.ok) throw new Error("API error")
+    const d=await r.json()
+
+    const src=d.sources||{}
+    const vt=src.virustotal||{malicious:0,total:0}
+    const ab=src.abuseipdb||{score:0}
+    const otx=src.otx||{pulses:0}
+
+    badge(vtVerdictEl,vtVerdict(vt.malicious))
+    vtScore.textContent=`${vt.malicious} / ${vt.total}`
+
+    badge(abuseVerdictEl,abuseVerdict(ab.score))
+    abuseScore.textContent=ab.score
+
+    badge(otxVerdictEl,otxVerdict(otx.pulses))
+    otxScore.textContent=otx.pulses
+    otxTags.innerHTML=otx.tags.map(t=>`<span class="tag">${t}</span>`).join("")
+    otxLink.href=`https://otx.alienvault.com/indicator/ip/${ioc}`
+
+    res.style.display="block"
+  }catch(e){
+    console.error(e)
+    showError("Failed to fetch IOC intelligence")
+  }
 }
 
-function block(name,v,val,link,extra=""){
-  return `<div class="card">
-    <b>${name}</b>
-    <span class="badge ${v}">${v}</span>
-    <h2>${val}</h2>
-    ${extra}<br>
-    <a href="${link}" target="_blank">View source ↗</a>
-  </div>`;
+function showError(m){
+  errorBox.textContent=m
+  errorBox.style.display="block"
 }
+
+const vtVerdictEl=document.getElementById("vtVerdict")
+const vtScore=document.getElementById("vtScore")
+const abuseVerdictEl=document.getElementById("abuseVerdict")
+const abuseScore=document.getElementById("abuseScore")
+const otxVerdictEl=document.getElementById("otxVerdict")
+const otxScore=document.getElementById("otxScore")
+const otxTags=document.getElementById("otxTags")
+const otxLink=document.getElementById("otxLink")
 </script>
 </body>
 </html>
