@@ -14,15 +14,20 @@
   <!-- Tailwind (for premium UI styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-<style>
 :root{
   --bg:#020617;--panel:#0f172a;--border:#1e293b;
   --purple:#7c3aed;--green:#22c55e;
   --yellow:#f59e0b;--red:#ef4444;
   --text:#e5e7eb;--muted:#94a3b8;
 }
-  
-  /* Glass effect for panel */
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Inter,system-ui,sans-serif;
+  background:radial-gradient(circle at top,#020617,#000);
+  color:var(--text)
+}
+
+ /* Glass effect for panel */
     .glass {
       background: rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(14px);
@@ -35,15 +40,16 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-  header{text-align:center;padding:150px 20px 30px}
-  header h1{margin:0;font-size:34px;color:#a78bfa}
-  header p{margin-top:8px;color:var(--muted)}
+  
+header{text-align:center;padding:150px 20px 30px}
+header h1{margin:0;font-size:34px;color:#a78bfa}
+header p{margin-top:8px;color:var(--muted)}
 
 .ioc-box{
-  max-width:760px;margin:200px auto;
+  max-width:760px;margin:40px auto;
   background:linear-gradient(180deg,#0f172a,#020617);
   border:1px solid var(--border);
-  border-radius:18px;padding:15px
+  border-radius:18px;padding:26px
 }
 .ioc-row{display:flex;gap:14px;margin-top:14px}
 .ioc-row input{
@@ -64,7 +70,7 @@
   border-radius:12px;padding:14px;color:#fecaca
 }
 
-
+#result{max-width:760px;margin:40px auto;display:none}
   
   body{background:#050814;color:#fff;font-family:Inter,Arial}
 .card{background:#0b1220;border-radius:14px;padding:60px;margin:16px auto;max-width:620px}
@@ -82,7 +88,7 @@ a{color:#8b5cf6;text-decoration:none}
     <div class="flex gap-6 text-gray-300 font-semibold">
       <a href="/" class="hover:text-white">Home</a>
       <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
-      <a href="/secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
       <a href="README.md" class="hover:text-white">Docs</a>
     </div>
   </nav>
@@ -90,8 +96,8 @@ a{color:#8b5cf6;text-decoration:none}
 <div class="ioc-box">
   <label>Enter IOC</label>
   <div class="ioc-row">
-    <input id="ioc" placeholder="IP / Domain / Hash">
-    <button onclick="run()">Run IOC Check</button>
+    <input id="iocInput" placeholder="IP / Domain / Hash">
+    <button onclick="runIOC()">Run IOC Check</button>
   </div>
 </div>
 
@@ -104,7 +110,7 @@ function saveHistory(ioc){
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
-async function run(){
+async function runIOC(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
   saveHistory(ioc);
