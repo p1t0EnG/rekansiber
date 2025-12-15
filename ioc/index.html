@@ -13,8 +13,10 @@
 
   <!-- Tailwind (for premium UI styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
- 
-<style> 
+
+
+<!-- batas -->
+<style>
 :root{
   --bg:#020617;--panel:#0f172a;--border:#1e293b;
   --purple:#7c3aed;--green:#22c55e;
@@ -47,7 +49,7 @@ header h1{margin:0;font-size:34px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
 
 .ioc-box{
-  max-width:760px;margin:150px auto;
+  max-width:760px;margin:40px auto;
   background:linear-gradient(180deg,#0f172a,#020617);
   border:1px solid var(--border);
   border-radius:18px;padding:26px
@@ -72,18 +74,74 @@ header p{margin-top:8px;color:var(--muted)}
 }
 
 #result{max-width:760px;margin:40px auto;display:none}
-  
- body{background:#050814;color:#fff;font-family:Inter,Arial}
-.card{background:#0b1220;border-radius:14px;padding:60px;margin:16px auto;max-width:620px}
+
+<!-- batas -->
+
+
+body{background:#050814;color:#fff;font-family:Inter,Arial}
+.card{
+  background:linear-gradient(180deg,#0f172a,#020617);
+  border:1px solid var(--border);
+  border-radius:16px;padding:20px;margin-bottom:20px
+}
+.card h3{margin:0 0 10px;font-size:18px}
+
+.badge{
+  display:inline-block;padding:6px 14px;
+  border-radius:999px;font-weight:700;font-size:14px
+}
+.low{background:rgba(34,197,94,.15);color:var(--green)}
+.medium{background:rgba(245,158,11,.15);color:var(--yellow)}
+.high{background:rgba(239,68,68,.15);color:var(--red)}
+
+.score{font-size:28px;font-weight:800}
+.muted{color:var(--muted);font-size:14px}
+
+footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
+
+.source-link{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+  font-size:14px;
+  color:#a78bfa;
+  text-decoration:none;
+}
+.source-link:hover{
+  text-decoration:underline;
+}
+
+.otx-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
+}
+
+.otx-tags{
+  padding:6px 12px;
+  font-size:13px;
+  border-radius:10px;
+  background:#020617;
+  border:1px solid #1e293b;
+  color:#e5e7eb;
+}
+
+<!-- batas lama -->
+<!--.card{background:#0b1220;border-radius:14px;padding:20px;margin:16px 
+auto;max-width:620px}
 .badge{padding:4px 10px;border-radius:999px;font-size:12px}
 .HIGH{background:#7f1d1d}.MEDIUM{background:#92400e}.LOW{background:#064e3b}
 a{color:#8b5cf6;text-decoration:none}
-.tag{background:#1f2937;padding:4px 8px;border-radius:8px;margin:2px;display:inline-block;font-size:12px}
+.tag{background:#1f2937;padding:4px 8px;border-radius:8px;margin:2px;display:inline-block;font-size:12px} -->
+
 </style>
 </head>
 
 <body>
- <!-- NAVBAR -->
+
+<!-- NAVBAR -->
   <nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] max-w-6xl glass rounded-2xl px-6 py-3 flex justify-between items-center shadow-xl z-20">
     <h1 class="text-xl font-bold gradient-text tracking-wide">RA SECURITY</h1>
     <div class="flex gap-6 text-gray-300 font-semibold">
@@ -93,16 +151,24 @@ a{color:#8b5cf6;text-decoration:none}
       <a href="/README.md" class="hover:text-white">Docs</a>
     </div>
   </nav>
-    
+
+<header>
+  <h1>IOC Intelligence Dashboard</h1>
+  <p>VirusTotal · AbuseIPDB · OTX </p>
+</header>
+
+
 <div class="ioc-box">
   <label>Enter IOC</label>
   <div class="ioc-row">
-    <input id="ioc" placeholder="IP / Domain / Hash">
+    <input id="iocInput" placeholder="IP / Domain / Hash">
     <button onclick="runIOC()">Run IOC Check</button>
   </div>
 </div>
 
-<div id="result"></div>
+<div id="errorBox"></div>
+
+<div id="result">
 
 <script>
 function saveHistory(ioc){
@@ -111,7 +177,7 @@ function saveHistory(ioc){
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
-async function runIOC(){
+async function run(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
   saveHistory(ioc);
