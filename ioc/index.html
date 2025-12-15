@@ -14,45 +14,47 @@
   <!-- Tailwind (for premium UI styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- batas style-->
-  
+<!-- batas Style -->
+
 <style>
-<!-- batas baru-->
+
+/* batas Style baru */
 :root{
   --bg:#020617;--panel:#0f172a;--border:#1e293b;
   --purple:#7c3aed;--green:#22c55e;
   --yellow:#f59e0b;--red:#ef4444;
   --text:#e5e7eb;--muted:#94a3b8;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;font-family:Inter,system-ui,sans-serif;
-  background:radial-gradient(circle at top,#020617,#000);
-  color:var(--text)
-}
-/* Glass effect for navbar */
-    .glass {
+
+
+/* setting untuk header */
+header{text-align:center;padding:150px 20px 30px}
+header h1{margin:0;font-size:34px;color:#a78bfa}
+header p{margin-top:8px;color:var(--muted)}
+
+ /* Glass effect for navbar */
+  .glass {
       background: rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.09);
     }
-
       /* Gradient text */
     .gradient-text {
       background: linear-gradient(90deg, #7b5cff, #ff5fb6);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-  
-header{text-align:center;padding:150px 20px 30px}
-header h1{margin:0;font-size:34px;color:#a78bfa}
-header p{margin-top:8px;color:var(--muted)}
 
-  .ioc-box{
-  max-width:760px;margin:40px auto;
+body{
+  margin:0;font-family:Inter,system-ui,sans-serif;
+  background:radial-gradient(circle at top,#020617,#000);
+  color:var(--text)
+}
+
+.ioc-box{
+  max-width:760px;margin:30px auto;
   background:linear-gradient(180deg,#0f172a,#020617);
   border:1px solid var(--border);
-  border-radius:18px;padding:26px
+  border-radius:18px;padding:30px
 }
 .ioc-row{display:flex;gap:14px;margin-top:14px}
 .ioc-row input{
@@ -73,74 +75,54 @@ header p{margin-top:8px;color:var(--muted)}
   border-radius:12px;padding:14px;color:#fecaca
 }
 
-<!-- .card{
-  background:linear-gradient(180deg,#0f172a,#020617);
-  border:1px solid var(--border);
-  border-radius:16px;padding:20px;margin-bottom:20px
-.card h3{margin:0 0 10px;font-size:18px} -->
+/* batas Style baru */
 
-.badge{
-  display:inline-block;padding:6px 14px;
-  border-radius:999px;font-weight:700;font-size:14px
-}  
-  
-<!-- batas baru-->
-
-  
-<!-- body{background:#050814;color:#fff;font-family:Inter,Arial} -->
-<!-- .card{background:#0b1220;border-radius:14px;padding:20px;margin:16px auto;max-width:620px} -->
-<!--.badge{padding:4px 10px;border-radius:999px;font-size:12px} -->
+.card{background:#0b1220;border-radius:14px;padding:20px;margin:16px auto;max-width:620px}
+.badge{padding:4px 10px;border-radius:999px;font-size:12px}
 .HIGH{background:#7f1d1d}.MEDIUM{background:#92400e}.LOW{background:#064e3b}
-<!-- a{color:#8b5cf6;text-decoration:none} -->
+a{color:#8b5cf6;text-decoration:none}
 .tag{background:#1f2937;padding:4px 8px;border-radius:8px;margin:2px;display:inline-block;font-size:12px}
 </style>
 </head>
 
-  
-<!-- batas body-->
-
 <body>
-<!-- NAVBAR -->
+  <!-- NAVBAR -->
   <nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] max-w-6xl glass rounded-2xl px-6 py-3 flex justify-between items-center shadow-xl z-20">
     <h1 class="text-xl font-bold gradient-text tracking-wide">RA SECURITY</h1>
     <div class="flex gap-6 text-gray-300 font-semibold">
       <a href="/" class="hover:text-white">Home</a>
-      <a href="ioc.html" class="hover:text-white">IOC Checker</a>
-      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
-      <a href="README.md" class="hover:text-white">Docs</a>
+      <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
+      <a href="/secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="/README.md" class="hover:text-white">Docs</a>
     </div>
   </nav>
-   
+  
 <header>
   <h1>IOC Intelligence Dashboard</h1>
   <p>VirusTotal · AbuseIPDB · OTX </p>
 </header>
 
+
+
 <div class="ioc-box">
   <label>Enter IOC</label>
   <div class="ioc-row">
-    <input id="ioc" placeholder="IP / Domain / Hash">
-    <button onclick="run()">Run IOC Check</button>
-  </div>
+  <input id="ioc" placeholder="IP / Domain / Hash" style="width:75%">
+  <button onclick="run()">Run IOC Check</button>
 </div>
 
-<div id="errorBox"></div>
 
-<div id="result">
+<div id="errorBox"></div>
+<div id="result"></div>
 
 <script>
-function saveHistory(ioc){
-  let h=JSON.parse(localStorage.getItem("ioc_history")||"[]");
-  h=h.filter(x=>x!==ioc); h.unshift(ioc);
-  localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
-}
-
 async function run(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
   saveHistory(ioc);
 
   const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
+  if(!r.ok) throw new Error("API error")
   const d=await r.json();
 
   const s=d.sources;
@@ -149,12 +131,11 @@ async function run(){
   ${block("AbuseIPDB",s.abuseipdb.verdict,s.abuseipdb.score,s.abuseipdb.link)}
   ${block("AlienVault OTX",s.otx.verdict,s.otx.pulses+" pulses",s.otx.link,
     s.otx.tags.map(t=>`<span class="tag">${t}</span>`).join(""))}
-  ${block("MXToolbox",s.mxtoolbox.verdict,s.mxtoolbox.listed?"LISTED":"CLEAN",s.mxtoolbox.link)}
-  `;
+  ;
 }
 
 function block(name,v,val,link,extra=""){
-  return `<div class="ioc-box">
+  return `<div class="box">
     <b>${name}</b>
     <span class="badge ${v}">${v}</span>
     <h2>${val}</h2>
