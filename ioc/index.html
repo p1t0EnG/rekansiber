@@ -93,48 +93,33 @@ header p{margin-top:8px;color:var(--muted)}
 
 footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
 
-/* OTX TAG LIST */
-.otx-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+.source-link{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+  font-size:14px;
+  color:#a78bfa;
+  text-decoration:none;
+}
+.source-link:hover{
+  text-decoration:underline;
 }
 
-.otx-tags {
- background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  color: #e5e7eb;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 8px;           /* kotak rounded */
-  line-height: 1;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
-  transition: all 0.15s ease;
+.otx-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
 }
 
-.otx-tags:hover {
-  border-color: #a78bfa;
-  color: #ddd6fe;
-  background: rgba(124, 58, 237, 0.15);
-}
-
-/* Source link */
-.source-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #a78bfa;
-  text-decoration: none;
-}
-
-.source-link:hover {
-  text-decoration: underline;
-  color: #c4b5fd;
+.otx-tags{
+  padding:6px 12px;
+  font-size:13px;
+  border-radius:10px;
+  background:#020617;
+  border:1px solid #1e293b;
+  color:#e5e7eb;
 }
 
 </style>
@@ -175,9 +160,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <span id="vtVerdict" class="badge"></span>
     <div class="score" id="vtScore"></div>
     <div class="muted">Malicious detections</div>
-    
-    <a id="vtLink" class="source-link" target="_blank">
-      View on VirusTotal ↗
+   <a id="vtLink" class="source-link" target="_blank">
+  View on VirusTotal ↗
+   </a>
   </div>
 
   <div class="card">
@@ -185,9 +170,9 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <span id="abuseVerdict" class="badge"></span>
     <div class="score" id="abuseScore"></div>
     <div class="muted">Abuse confidence score</div>
-    
     <a id="abuseLink" class="source-link" target="_blank">
-      View on AbuseIPDB ↗
+  View on AbuseIPDB ↗
+    </a>
   </div>
 
   <div class="card">
@@ -234,12 +219,12 @@ async function runIOC(){
     // VT
     badge(vtVerdictEl,vtVerdict(vt.malicious))
     vtScore.textContent=`${vt.malicious} / ${vt.total}`
-    vtLink.href = `https://www.virustotal.com/gui/ip-address/${ioc}`;
+    document.getElementById("vtLink").href = `https://www.virustotal.com/gui/ip-address/${ioc}`
     
     // abuseip
     badge(abuseVerdictEl,abuseVerdict(ab.score))
     abuseScore.textContent=ab.score
-    abuseLink.href = `https://www.abuseipdb.com/check/${ioc}`;
+    document.getElementById("abuseLink").href = `https://www.abuseipdb.com/check/${ioc}`
 
     badge(otxVerdictEl,otxVerdict(otx.pulses))
     otxScore.textContent=otx.pulses
@@ -247,19 +232,20 @@ async function runIOC(){
     // NORMALISASI TAG OTX
     // ===============================
     let tags = []
-      if (Array.isArray(otx.tags)) {
-        tags = otx.tags
-          } else if (typeof otx.tags === "string") {
-            tags = otx.tags.split(/\s+/) // pecah berdasarkan spasi
-          }
+    if (Array.isArray(otx.tags)) {
+    tags = otx.tags
+    } else if (typeof otx.tags === "string") {
+      tags = otx.tags.split(/\s+/)
+    }
+  
+    const tagBox = document.getElementById("otxTags")
+    tagBox.innerHTML = tags
+    .slice(0, 40)
+    .map(t => `<span class="otx-tag">${t}</span>`)
+    .join("")
 
-   const tagBox = document.getElementById("otxTags")
-tagBox.innerHTML = tags
-  .slice(0, 40)
-  .map(t => `<span class="otx-tag">${t}</span>`)
-  .join("")
-    
-    otxLink.href=`https://otx.alienvault.com/indicator/ip/${ioc}`
+    // source link
+    document.getElementById("otxLink").href = `https://otx.alienvault.com/indicator/ip/${ioc}`
 
     res.style.display="block"
   }catch(e){
