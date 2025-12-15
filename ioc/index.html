@@ -26,7 +26,7 @@
   --text:#e5e7eb;--muted:#94a3b8;
 
 
-/* setting untuk header */
+/* setting untuk header dan footer */
 header{text-align:center;padding:150px 20px 30px}
 header h1{margin:0;font-size:34px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
@@ -116,6 +116,7 @@ a{color:#8b5cf6;text-decoration:none}
 <div id="result"></div>
 
 <script>
+
 async function run(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
@@ -135,7 +136,7 @@ async function run(){
 }
 
 function block(name,v,val,link,extra=""){
-  return `<div class="box">
+  return `<div class="ioc-box">
     <b>${name}</b>
     <span class="badge ${v}">${v}</span>
     <h2>${val}</h2>
