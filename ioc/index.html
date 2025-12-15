@@ -177,7 +177,7 @@ function saveHistory(ioc){
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
-async function run(){
+async function runIOC(){
   const ioc=document.getElementById("ioc").value.trim();
   if(!ioc) return;
   saveHistory(ioc);
