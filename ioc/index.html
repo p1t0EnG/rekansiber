@@ -185,6 +185,8 @@ async function runIOC(){
 
     badge(otxVerdictEl,otxVerdict(otx.pulses))
     otxScore.textContent=otx.pulses
+    otxTags.innerHTML=otx.tags.map(t=>`<span class="tag">${t}</span>`).join("")
+    otxLink.href=`https://otx.alienvault.com/indicator/ip/${ioc}`
 
     res.style.display="block"
   }catch(e){
@@ -204,6 +206,8 @@ const abuseVerdictEl=document.getElementById("abuseVerdict")
 const abuseScore=document.getElementById("abuseScore")
 const otxVerdictEl=document.getElementById("otxVerdict")
 const otxScore=document.getElementById("otxScore")
+const otxTags=document.getElementById("otxTags")
+const otxLink=document.getElementById("otxLink")
 </script>
 
 </body>
