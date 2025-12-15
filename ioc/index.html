@@ -13,8 +13,23 @@
 
   <!-- Tailwind (for premium UI styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
 <style>
-body{background:#050814;color:#fff;font-family:Inter,Arial}
+/* Glass effect for panel */
+    .glass {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+      /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(90deg, #7b5cff, #ff5fb6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  
+  body{background:#050814;color:#fff;font-family:Inter,Arial}
 .card{background:#0b1220;border-radius:14px;padding:20px;margin:16px auto;max-width:620px}
 .badge{padding:4px 10px;border-radius:999px;font-size:12px}
 .HIGH{background:#7f1d1d}.MEDIUM{background:#92400e}.LOW{background:#064e3b}
