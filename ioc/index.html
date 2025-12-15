@@ -82,7 +82,7 @@ a{color:#8b5cf6;text-decoration:none}
     <div class="flex gap-6 text-gray-300 font-semibold">
       <a href="/" class="hover:text-white">Home</a>
       <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
-      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="/secdashboard.html" class="hover:text-white">Dashboard</a>
       <a href="README.md" class="hover:text-white">Docs</a>
     </div>
   </nav>
@@ -98,16 +98,16 @@ a{color:#8b5cf6;text-decoration:none}
 <div id="result"></div>
 
 <script>
-function saveHistory(ioc){
+function saveHistory(iocInput){
   let h=JSON.parse(localStorage.getItem("ioc_history")||"[]");
-  h=h.filter(x=>x!==ioc); h.unshift(ioc);
+  h=h.filter(x=>x!==iocInput); h.unshift(iocInput);
   localStorage.setItem("ioc_history",JSON.stringify(h.slice(0,20)));
 }
 
 async function run(){
-  const ioc=document.getElementById("ioc").value.trim();
-  if(!ioc) return;
-  saveHistory(ioc);
+  const iocInput=document.getElementById("iocInput").value.trim();
+  if(!iocInput) return;
+  saveHistory(iocInput);
 
   const r=await fetch(`/api/ioc?ioc=${ioc}`);
   const d=await r.json();
