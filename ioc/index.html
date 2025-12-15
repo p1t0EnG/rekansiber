@@ -15,7 +15,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   
 <style>
-/* Glass effect for panel */
+:root{
+  --bg:#020617;--panel:#0f172a;--border:#1e293b;
+  --purple:#7c3aed;--green:#22c55e;
+  --yellow:#f59e0b;--red:#ef4444;
+  --text:#e5e7eb;--muted:#94a3b8;
+}
+  
+  /* Glass effect for panel */
     .glass {
       background: rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(14px);
@@ -28,6 +35,9 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+  header{text-align:center;padding:150px 20px 30px}
+  header h1{margin:0;font-size:34px;color:#a78bfa}
+  header p{margin-top:8px;color:var(--muted)}
   
   body{background:#050814;color:#fff;font-family:Inter,Arial}
 .card{background:#0b1220;border-radius:14px;padding:20px;margin:16px auto;max-width:620px}
