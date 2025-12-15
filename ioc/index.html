@@ -140,7 +140,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
   
 <header>
   <h1>IOC Intelligence Dashboard</h1>
-  <p>VirusTotal · AbuseIPDB · OTX · MXToolbox</p>
+  <p>VirusTotal · AbuseIPDB · OTX </p>
 </header>
 
 <div class="ioc-box">
@@ -171,7 +171,7 @@ footer{text-align:center;padding:40px 0 20px;color:var(--muted)}
     <div class="score" id="abuseScore"></div>
     <div class="muted">Abuse confidence score</div>
     <a id="abuseLink" class="source-link" target="_blank">
-  View on AbuseIPDB ↗
+    View on AbuseIPDB ↗
     </a>
   </div>
 
@@ -211,10 +211,15 @@ async function runIOC(){
     if(!r.ok) throw new Error("API error")
     const d=await r.json()
 
-    const src=d.sources||{}
-    const vt=src.virustotal||{malicious:0,total:0}
-    const ab=src.abuseipdb||{score:0}
-    const otx=src.otx||{pulses:0, tags: []}
+   const s=d.sources;
+  document.getElementById("result").innerHTML=`
+  ${block("VirusTotal",s.virustotal.verdict,`${s.virustotal.malicious}/${s.virustotal.total}`,s.virustotal.link)}
+  ${block("AbuseIPDB",s.abuseipdb.verdict,s.abuseipdb.score,s.abuseipdb.link)}
+  ${block("AlienVault OTX",s.otx.verdict,s.otx.pulses+" pulses",s.otx.link,
+    s.otx.tags.map(t=>`<span class="tag">${t}</span>`).join(""))}
+  ${block("MXToolbox",s.mxtoolbox.verdict,s.mxtoolbox.listed?"LISTED":"CLEAN",s.mxtoolbox.link)}
+  `;
+  }
 
     // VT
     badge(vtVerdictEl,vtVerdict(vt.malicious))
