@@ -13,8 +13,8 @@
 
   <!-- Tailwind (for premium UI styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-<style>  
+ 
+<style> 
 :root{
   --bg:#020617;--panel:#0f172a;--border:#1e293b;
   --purple:#7c3aed;--green:#22c55e;
@@ -47,7 +47,7 @@ header h1{margin:0;font-size:34px;color:#a78bfa}
 header p{margin-top:8px;color:var(--muted)}
 
 .ioc-box{
-  max-width:760px;margin:40px auto;
+  max-width:760px;margin:150px auto;
   background:linear-gradient(180deg,#0f172a,#020617);
   border:1px solid var(--border);
   border-radius:18px;padding:26px
@@ -73,7 +73,7 @@ header p{margin-top:8px;color:var(--muted)}
 
 #result{max-width:760px;margin:40px auto;display:none}
   
-  body{background:#050814;color:#fff;font-family:Inter,Arial}
+ body{background:#050814;color:#fff;font-family:Inter,Arial}
 .card{background:#0b1220;border-radius:14px;padding:60px;margin:16px auto;max-width:620px}
 .badge{padding:4px 10px;border-radius:999px;font-size:12px}
 .HIGH{background:#7f1d1d}.MEDIUM{background:#92400e}.LOW{background:#064e3b}
@@ -89,15 +89,15 @@ a{color:#8b5cf6;text-decoration:none}
     <div class="flex gap-6 text-gray-300 font-semibold">
       <a href="/" class="hover:text-white">Home</a>
       <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
-      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
-      <a href="README.md" class="hover:text-white">Docs</a>
+      <a href="/secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="/README.md" class="hover:text-white">Docs</a>
     </div>
   </nav>
     
 <div class="ioc-box">
   <label>Enter IOC</label>
   <div class="ioc-row">
-    <input id="iocInput" placeholder="IP / Domain / Hash">
+    <input id="ioc" placeholder="IP / Domain / Hash">
     <button onclick="runIOC()">Run IOC Check</button>
   </div>
 </div>
