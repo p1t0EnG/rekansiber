@@ -29,7 +29,7 @@ export async function onRequest(context) {
     /* =====================
        ABUSEIPDB
     ===================== */
-    let abuse = { score: 0, verdict: "LOW", link: "" };
+    let abuse = { score: 0, verdict: "LOW",country: "N/A", type: "Unknown", isp: "Unknown",totalReports: 0, link: "" };
 
     try {
       const res = await fetch(
