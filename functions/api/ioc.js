@@ -42,11 +42,12 @@ export async function onRequest(context) {
         }
       );
       const j = await res.json();
-      abuse.score = j.data.abuseConfidenceScore || 0;
+      abuse.score   = data.abuseConfidenceScore ?? 0;
+      abuse.country = data.countryCode ?? "N/A";
+      abuse.type    = data.usageType ?? "Unknown";
+      abuse.isp     = data.isp ?? "Unknown";
       abuse.totalReports = j.data.totalReports || 0;
-      abuse.country = j.data.countryCode || "";
-      abuse.type = j.data.usageType || "";
-      abuse.isp = j.data.isp || "";
+
       abuse.verdict = abuse.score >= 50 ? "HIGH" : abuse.score >= 10 ? "MEDIUM" : "LOW";
       abuse.link = `https://www.abuseipdb.com/check/${ioc}`;
     } catch {}
