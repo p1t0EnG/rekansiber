@@ -24,3 +24,15 @@ export function isValidIoc(value: string, type: IocType): boolean {
       }
   }
 }
+
+// Dipakai bulk checker: user cuma tempel daftar value tanpa milih type satu-satu.
+// Urutan cek penting -- hash & url tidak ambigu, dicek duluan sebelum ip/domain.
+export function detectIocType(rawValue: string): IocType | null {
+  const value = rawValue.trim();
+  if (!value) return null;
+  if (isValidIoc(value, 'hash')) return 'hash';
+  if (isValidIoc(value, 'url')) return 'url';
+  if (isValidIoc(value, 'ip')) return 'ip';
+  if (isValidIoc(value, 'domain')) return 'domain';
+  return null;
+}

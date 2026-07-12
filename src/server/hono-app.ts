@@ -1,10 +1,9 @@
 import { Hono } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { isValidIoc } from './ioc/validate';
-import { checkVirusTotal, checkAbuseIPDB, checkOTX } from './ioc/providers';
-import { aggregateVerdict } from './ioc/aggregate';
+import { checkIoc } from './ioc/check';
 import { checkRateLimit } from './ioc/rate-limit';
-import type { IocType } from './ioc/types';
+import { MAX_BULK_ITEMS, type IocType } from './ioc/types';
 import { verifyPassword } from './auth/password';
 import { createSession, getSessionUser, deleteSession, type SessionUser } from './auth/session';
 import { requireAuth, SESSION_COOKIE_NAME } from './auth/middleware';
@@ -48,14 +47,7 @@ app.post('/ioc/check', async (c) => {
     return c.json({ error: 'Terlalu banyak permintaan, coba lagi sebentar lagi' }, 429);
   }
 
-  const [vt, abuseIpdb, otx] = await Promise.all([
-    checkVirusTotal(body.value, body.type, c.env.VT_API_KEY),
-    checkAbuseIPDB(body.value, body.type, c.env.ABUSEIPDB_API_KEY),
-    checkOTX(body.value, body.type, c.env.OTX_API_KEY),
-  ]);
-
-  const providers = [vt, abuseIpdb, otx].filter((r) => r !== null);
-  const verdict = aggregateVerdict(providers);
+  const { verdict, providers } = await checkIoc(c.env, body.value, body.type);
 
   await c.env.DB.prepare(
     `INSERT INTO ioc_checks (user_id, ioc_value, ioc_type, source, verdict, result_summary)
@@ -65,6 +57,49 @@ app.post('/ioc/check', async (c) => {
     .run();
 
   return c.json({ value: body.value, type: body.type, verdict, providers });
+});
+
+// --- Bulk IOC Checker (tim SOC, butuh login) ---
+// Upload banyak IOC sekaligus (type sudah dideteksi otomatis di frontend), diproses
+// paralel, disimpan ke ioc_checks dengan source: 'soc' + user_id anggota yang login.
+app.post('/ioc/bulk-check', requireAuth, async (c) => {
+  const body = await c.req.json<{ items: { value: string; type: IocType }[] }>().catch(() => null);
+
+  if (!body?.items || !Array.isArray(body.items) || body.items.length === 0) {
+    return c.json({ error: 'items wajib diisi (array of {value, type})' }, 400);
+  }
+  if (body.items.length > MAX_BULK_ITEMS) {
+    return c.json({ error: `Maksimal ${MAX_BULK_ITEMS} IOC per batch` }, 400);
+  }
+
+  const user = c.get('user');
+
+  const results = await Promise.all(
+    body.items.map(async (item) => {
+      if (!item?.value || !VALID_TYPES.includes(item.type) || !isValidIoc(item.value, item.type)) {
+        return {
+          value: item?.value ?? '',
+          type: item?.type ?? null,
+          verdict: 'unknown' as const,
+          error: 'Format tidak valid',
+          providers: [],
+        };
+      }
+
+      const { verdict, providers } = await checkIoc(c.env, item.value, item.type);
+
+      await c.env.DB.prepare(
+        `INSERT INTO ioc_checks (user_id, ioc_value, ioc_type, source, verdict, result_summary)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(user.id, item.value, item.type, 'soc', verdict, JSON.stringify(providers))
+        .run();
+
+      return { value: item.value, type: item.type, verdict, providers };
+    }),
+  );
+
+  return c.json({ results });
 });
 
 // --- Berita CVE & Ransomware (dibaca dari cache KV, diisi oleh Cron Trigger) ---
