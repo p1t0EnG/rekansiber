@@ -42,7 +42,14 @@ async function hashPassword(pw) {
 const hash = await hashPassword(password);
 const sql = `INSERT INTO users (email, password_hash, full_name, role) VALUES ('${email.replace(/'/g, "''")}', '${hash}', '${fullName.replace(/'/g, "''")}', '${role}');`;
 
+// PENTING: hash-nya mengandung tanda "$" (format pbkdf2$iterasi$salt$hash).
+// Kalau command di bawah dibungkus tanda kutip GANDA di shell (bash/zsh), setiap
+// "$..." dianggap variabel shell dan otomatis jadi string kosong -- hash rusak
+// tanpa pesan error. Makanya di sini setiap "$" di-escape jadi "\$" biar aman
+// dipakai persis apa adanya (jangan diubah manual jadi kutip tunggal atau dihapus \-nya).
+const shellSafeSql = sql.replace(/\$/g, '\\$');
+
 console.log('\nJalankan salah satu perintah berikut untuk menyimpan user ini:\n');
-console.log(`  wrangler d1 execute rekansiber-db --local --command "${sql}"`);
-console.log(`  wrangler d1 execute rekansiber-db --remote --command "${sql}"`);
+console.log(`  wrangler d1 execute rekansiber-db --local --command "${shellSafeSql}"`);
+console.log(`  wrangler d1 execute rekansiber-db --remote --command "${shellSafeSql}"`);
 console.log();
