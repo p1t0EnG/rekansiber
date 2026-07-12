@@ -21,8 +21,10 @@ export interface DashboardStats {
 }
 
 // Dipakai bareng oleh GET /api/dashboard/stats dan halaman dashboard.astro,
-// biar query agregasinya tidak dobel.
-export async function getDashboardStats(db: D1Database): Promise<DashboardStats> {
+// biar query agregasinya tidak dobel. userId diisi untuk role 'member' supaya
+// mereka cuma lihat aktivitas sendiri, dikosongkan (undefined) untuk admin
+// supaya lihat seluruh tim.
+export async function getDashboardStats(db: D1Database, userId?: number): Promise<DashboardStats> {
   const summaryResult = await db
     .prepare(
       `SELECT
@@ -35,9 +37,11 @@ export async function getDashboardStats(db: D1Database): Promise<DashboardStats>
          SUM(CASE WHEN ic.verdict = 'clean' THEN 1 ELSE 0 END) AS clean_count
        FROM ioc_checks ic
        JOIN users u ON u.id = ic.user_id
+       WHERE (?1 IS NULL OR u.id = ?1)
        GROUP BY u.id
        ORDER BY total_checks DESC`,
     )
+    .bind(userId ?? null)
     .all<UserStatsSummary>();
 
   const dailyResult = await db
@@ -50,9 +54,11 @@ export async function getDashboardStats(db: D1Database): Promise<DashboardStats>
        FROM ioc_checks ic
        JOIN users u ON u.id = ic.user_id
        WHERE ic.checked_at >= datetime('now', '-30 days')
+         AND (?1 IS NULL OR u.id = ?1)
        GROUP BY u.id, DATE(ic.checked_at)
        ORDER BY day DESC`,
     )
+    .bind(userId ?? null)
     .all<DailyStat>();
 
   return { summary: summaryResult.results, daily: dailyResult.results };

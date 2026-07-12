@@ -1,6 +1,6 @@
 ---
 interface Props {
-  user?: { full_name: string } | null;
+  user?: { full_name: string; role?: 'admin' | 'member' } | null;
 }
 const { user = null } = Astro.props;
 
@@ -11,11 +11,12 @@ const publicLinks = [
 ];
 
 const teamLinks = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/bulk-checker', label: 'Bulk Checker' },
-  { href: '/reports', label: 'Report' },
-  { href: '/phishing-reports', label: 'Phishing Report' },
-];
+  { href: '/dashboard', label: 'Dashboard', adminOnly: false },
+  { href: '/bulk-checker', label: 'Bulk Checker', adminOnly: false },
+  { href: '/phishing-reports', label: 'Phishing Report', adminOnly: false },
+  { href: '/reports', label: 'Report', adminOnly: true },
+  { href: '/profile', label: 'Profile', adminOnly: false },
+].filter((link) => !link.adminOnly || user?.role === 'admin');
 
 const currentPath = Astro.url.pathname;
 const isActive = (href: string) => (href === '/' ? currentPath === '/' : currentPath.startsWith(href));

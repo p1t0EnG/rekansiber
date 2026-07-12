@@ -4,9 +4,10 @@ import { isValidIoc } from './ioc/validate';
 import { checkIoc } from './ioc/check';
 import { checkRateLimit } from './ioc/rate-limit';
 import { MAX_BULK_ITEMS, type IocType } from './ioc/types';
-import { verifyPassword } from './auth/password';
+import { hashPassword, verifyPassword } from './auth/password';
 import { createSession, getSessionUser, deleteSession, type SessionUser } from './auth/session';
-import { requireAuth, SESSION_COOKIE_NAME } from './auth/middleware';
+import { requireAuth, requireRole, SESSION_COOKIE_NAME } from './auth/middleware';
+import { getUserPasswordHash, updateUserPassword } from './auth/user';
 import { getDashboardStats } from './dashboard/stats';
 import { getMonthlyStats, buildMonthlyReportPdf, buildMonthlyReportXlsx } from './reports/monthly';
 import {
@@ -164,9 +165,35 @@ app.get('/auth/me', async (c) => {
   return c.json({ user });
 });
 
+// Ganti password sendiri (admin maupun member) -- supaya admin tidak perlu
+// reset-in password anggota tim satu-satu lewat wrangler d1 execute.
+app.post('/auth/change-password', requireAuth, async (c) => {
+  const body = await c.req.json<{ current_password: string; new_password: string }>().catch(() => null);
+
+  if (!body?.current_password || !body?.new_password) {
+    return c.json({ error: 'Password saat ini dan password baru wajib diisi' }, 400);
+  }
+  if (body.new_password.length < 8) {
+    return c.json({ error: 'Password baru minimal 8 karakter' }, 400);
+  }
+
+  const user = c.get('user');
+  const currentHash = await getUserPasswordHash(c.env.DB, user.id);
+  if (!currentHash || !(await verifyPassword(body.current_password, currentHash))) {
+    return c.json({ error: 'Password saat ini salah' }, 401);
+  }
+
+  const newHash = await hashPassword(body.new_password);
+  await updateUserPassword(c.env.DB, user.id, newHash);
+
+  return c.json({ message: 'Password berhasil diganti' });
+});
+
 // --- Dashboard: statistik pengecekan per anggota tim (butuh login) ---
+// Member cuma lihat aktivitas sendiri, admin lihat seluruh tim.
 app.get('/dashboard/stats', requireAuth, async (c) => {
-  const stats = await getDashboardStats(c.env.DB);
+  const user = c.get('user');
+  const stats = await getDashboardStats(c.env.DB, user.role === 'admin' ? undefined : user.id);
   return c.json(stats);
 });
 
@@ -178,7 +205,7 @@ function resolveReportMonth(c: Context<AppEnv>): string | null {
   return YEAR_MONTH_RE.test(month) ? month : null;
 }
 
-app.get('/reports/monthly.pdf', requireAuth, async (c) => {
+app.get('/reports/monthly.pdf', requireAuth, requireRole('admin'), async (c) => {
   const month = resolveReportMonth(c);
   if (!month) {
     return c.json({ error: 'Parameter month harus format YYYY-MM' }, 400);
@@ -193,7 +220,7 @@ app.get('/reports/monthly.pdf', requireAuth, async (c) => {
   });
 });
 
-app.get('/reports/monthly.xlsx', requireAuth, async (c) => {
+app.get('/reports/monthly.xlsx', requireAuth, requireRole('admin'), async (c) => {
   const month = resolveReportMonth(c);
   if (!month) {
     return c.json({ error: 'Parameter month harus format YYYY-MM' }, 400);

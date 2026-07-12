@@ -1,0 +1,35 @@
+---
+import Sidebar from '../components/Sidebar.astro';
+import type { SessionUser } from '../server/auth/session';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  user: SessionUser | null;
+}
+
+const { title, user } = Astro.props;
+---
+
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} — Rekan Siber</title>
+  </head>
+  <body>
+    <Sidebar user={user} />
+    <div class="app-main">
+      <div class="container">
+        <slot />
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  .app-main {
+    margin-left: 68px;
+  }
+</style>

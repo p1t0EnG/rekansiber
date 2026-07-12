@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { listPhishingReports } from '../server/phishing/reports';
 
@@ -14,7 +14,7 @@ if (!user) {
 const reports = await listPhishingReports(db);
 ---
 
-<Layout title="Report Phishing" user={user}>
+<AppLayout title="Report Phishing" user={user}>
   <div class="page-header">
     <h1>Report Phishing ke Hosting Provider</h1>
     <p>
@@ -187,4 +187,4 @@ const reports = await listPhishingReports(db);
       });
     });
   </script>
-</Layout>
+</AppLayout>

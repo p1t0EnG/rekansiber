@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
@@ -9,11 +9,14 @@ const user = token ? await getSessionUser(db, token) : null;
 if (!user) {
   return Astro.redirect('/login');
 }
+if (user.role !== 'admin') {
+  return Astro.redirect('/dashboard');
+}
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 ---
 
-<Layout title="Report Bulanan" user={user}>
+<AppLayout title="Report Bulanan" user={user}>
   <div class="page-header">
     <h1>Report Bulanan</h1>
     <p>Pilih bulan, lalu download rekap pengecekan IOC per anggota tim dalam format PDF atau Excel.</p>
@@ -31,4 +34,4 @@ const currentMonth = new Date().toISOString().slice(0, 7);
       </div>
     </form>
   </div>
-</Layout>
+</AppLayout>

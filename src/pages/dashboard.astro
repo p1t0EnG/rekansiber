@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { getDashboardStats } from '../server/dashboard/stats';
 
@@ -11,7 +11,8 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-const { summary, daily } = await getDashboardStats(db);
+const isAdmin = user.role === 'admin';
+const { summary, daily } = await getDashboardStats(db, isAdmin ? undefined : user.id);
 
 const totals = summary.reduce(
   (acc, s) => ({
@@ -24,7 +25,7 @@ const totals = summary.reduce(
 );
 ---
 
-<Layout title="Dashboard" user={user}>
+<AppLayout title="Dashboard" user={user}>
   <div class="page-header">
     <h1>Dashboard</h1>
     <p>Selamat datang, {user.full_name} ({user.role}).</p>
@@ -50,7 +51,7 @@ const totals = summary.reduce(
   </div>
 
   <div class="card">
-    <h2>Ringkasan per Anggota</h2>
+    <h2>{isAdmin ? 'Ringkasan per Anggota' : 'Ringkasan Saya'}</h2>
     <table>
       <thead>
         <tr>
@@ -73,11 +74,15 @@ const totals = summary.reduce(
         ))}
       </tbody>
     </table>
-    {summary.length === 0 && <p class="empty-state">Belum ada data pengecekan dari tim SOC.</p>}
+    {summary.length === 0 && (
+      <p class="empty-state">
+        {isAdmin ? 'Belum ada data pengecekan dari tim SOC.' : 'Belum ada aktivitas pengecekan dari kamu.'}
+      </p>
+    )}
   </div>
 
   <div class="card">
-    <h2>Aktivitas 30 Hari Terakhir</h2>
+    <h2>{isAdmin ? 'Aktivitas Tim (30 Hari Terakhir)' : 'Aktivitas Saya (30 Hari Terakhir)'}</h2>
     <table>
       <thead>
         <tr>
@@ -98,4 +103,4 @@ const totals = summary.reduce(
     </table>
     {daily.length === 0 && <p class="empty-state">Belum ada aktivitas 30 hari terakhir.</p>}
   </div>
-</Layout>
+</AppLayout>

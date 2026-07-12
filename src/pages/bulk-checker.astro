@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { MAX_BULK_ITEMS } from '../server/ioc/types';
 
@@ -12,7 +12,7 @@ if (!user) {
 }
 ---
 
-<Layout title="Bulk IOC Checker" user={user}>
+<AppLayout title="Bulk IOC Checker" user={user}>
   <div class="page-header">
     <h1>Bulk IOC Checker</h1>
     <p>
@@ -198,4 +198,4 @@ if (!user) {
       URL.revokeObjectURL(url);
     });
   </script>
-</Layout>
+</AppLayout>

@@ -18,3 +18,15 @@ export async function requireAuth(c: Context<Env>, next: Next) {
   c.set('user', user);
   await next();
 }
+
+// Dipasang setelah requireAuth untuk endpoint yang cuma boleh diakses role tertentu
+// (mis. generate report bulanan -- khusus admin).
+export function requireRole(role: SessionUser['role']) {
+  return async (c: Context<Env>, next: Next) => {
+    const user = c.get('user');
+    if (user.role !== role) {
+      return c.json({ error: 'Khusus admin' }, 403);
+    }
+    await next();
+  };
+}

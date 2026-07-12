@@ -1,0 +1,106 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<AppLayout title="Profile" user={user}>
+  <div class="page-header">
+    <h1>Profile</h1>
+    <p>Kelola akun kamu sendiri di Rekan Siber.</p>
+  </div>
+
+  <div class="card" style="max-width: 420px;">
+    <h2>Informasi Akun</h2>
+    <div class="field">
+      <label>Nama</label>
+      <p class="info-value">{user.full_name}</p>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <p class="info-value">{user.email}</p>
+    </div>
+    <div class="field">
+      <label>Role</label>
+      <p class="info-value" style="text-transform: capitalize;">{user.role}</p>
+    </div>
+  </div>
+
+  <div class="card" style="max-width: 420px;">
+    <h2>Ganti Password</h2>
+    <form id="password-form">
+      <div class="field">
+        <label for="current-password">Password Saat Ini</label>
+        <input id="current-password" type="password" required autocomplete="current-password" />
+      </div>
+      <div class="field">
+        <label for="new-password">Password Baru</label>
+        <input id="new-password" type="password" required autocomplete="new-password" minlength="8" />
+      </div>
+      <div class="field">
+        <label for="confirm-password">Konfirmasi Password Baru</label>
+        <input id="confirm-password" type="password" required autocomplete="new-password" minlength="8" />
+      </div>
+      <button type="submit" class="btn" id="password-submit">Simpan Password Baru</button>
+    </form>
+    <p id="password-status" class="status-message" role="status"></p>
+  </div>
+
+  <style>
+    .info-value {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+  </style>
+
+  <script>
+    const form = document.getElementById('password-form') as HTMLFormElement;
+    const submitBtn = document.getElementById('password-submit') as HTMLButtonElement;
+    const statusEl = document.getElementById('password-status')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+      statusEl.removeAttribute('data-tone');
+
+      const current = (document.getElementById('current-password') as HTMLInputElement).value;
+      const next = (document.getElementById('new-password') as HTMLInputElement).value;
+      const confirm = (document.getElementById('confirm-password') as HTMLInputElement).value;
+
+      if (next !== confirm) {
+        statusEl.textContent = 'Konfirmasi password baru tidak cocok';
+        statusEl.setAttribute('data-tone', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_password: current, new_password: next }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+
+        if (!res.ok) {
+          statusEl.textContent = data.error ?? 'Gagal mengganti password';
+          statusEl.setAttribute('data-tone', 'error');
+          return;
+        }
+
+        statusEl.textContent = 'Password berhasil diganti';
+        statusEl.setAttribute('data-tone', 'success');
+        form.reset();
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</AppLayout>
