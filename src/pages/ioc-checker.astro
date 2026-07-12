@@ -10,7 +10,7 @@ const user = token ? await getSessionUser(db, token) : null;
 <Layout title="IOC Checker" user={user}>
   <div class="page-header">
     <h1>IOC Checker</h1>
-    <p>Masukkan IP, domain, hash, atau URL -- type-nya otomatis terdeteksi, lalu dicek ke VirusTotal, AbuseIPDB, dan OTX.</p>
+    <p>Masukkan IP, domain, hash, atau URL.</p>
   </div>
 
   <div class="card">
@@ -18,7 +18,7 @@ const user = token ? await getSessionUser(db, token) : null;
       <div class="field">
         <label for="ioc-value">Value</label>
         <div class="input-row">
-          <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required autocomplete="off" />
+          <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f" required autocomplete="off" />
           <span id="ioc-type-badge" class="badge" style="display:none;"></span>
         </div>
       </div>
