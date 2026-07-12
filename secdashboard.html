@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RA Security — Security Dashboard</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --glass-bg: rgba(255,255,255,0.04);
+      --card-bg: rgba(8,12,20,0.6);
+      --accent: #7b61ff;
+    }
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#060914 0%, #05060a 100%);
+      color: #e6eef9;
+    }
+    /* Vanta background (if you use it) expect #vanta-bg element behind */
+    #vanta-bg { position: fixed; inset:0; z-index:-1; pointer-events:none; }
+
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .muted { color: #9fb7ff; opacity:0.9; }
+
+    /* small helper for JSON output */
+    pre.json { background:#071028; padding:12px; border-radius:8px; overflow:auto; font-size:13px; }
+
+    /* table */
+    .table-row:hover { background: rgba(255,255,255,0.02); }
+  </style>
+</head>
+<body>
+
+  <!-- Optional vanta background placeholder (keep if you used VANTA on index) -->
+  <div id="vanta-bg"></div>
+
+  <div class="min-h-screen flex">
+
+    <!-- SIDEBAR -->
+    <aside class="w-20 md:w-64 bg-[#071028] glass px-3 md:px-6 py-6 flex flex-col gap-6">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold">RA</div>
+        <div class="hidden md:block">
+          <div class="text-lg font-bold">RA Security</div>
+          <div class="text-xs muted">Proactive Defense</div>
+        </div>
+      </div>
+
+      <nav class="flex flex-col gap-1 mt-6">
+        <a href="index.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5">
+          <svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7h18M12 3v18"/></svg>
+          <span class="hidden md:inline">Overview</span>
+        </a>
+
+        <a href="ioc.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5">
+          <svg class="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span class="hidden md:inline">IOC Checker</span>
+        </a>
+
+        <a href="#" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5">
+          <svg class="w-5 h-5 text-yellow-300" viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span class="hidden md:inline">Incidents</span>
+        </a>
+
+        <a href="secdashboard.html" class="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+          <svg class="w-5 h-5 text-pink-300" viewBox="0 0 24 24" fill="none"><path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span class="hidden md:inline">Security Dashboard</span>
+        </a>
+      </nav>
+
+      <div class="mt-auto hidden md:block text-xs muted">
+        ver. 0.9 • build 2025
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 p-6 md:p-10">
+
+      <!-- Header: title + controls -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold">Security Dashboard</h2>
+          <div class="text-sm muted mt-1">Overview of alerts, incidents, and threat telemetry</div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <label class="text-sm muted hidden md:block">Range</label>
+          <select id="timeRange" class="bg-[#071028] border border-white/5 text-white p-2 rounded">
+            <option value="1h">Last 1 hour</option>
+            <option value="6h">Last 6 hours</option>
+            <option value="24h" selected>Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+          </select>
+
+          <button id="refreshBtn" class="py-2 px-3 rounded bg-indigo-600 hover:bg-indigo-700">Refresh</button>
+
+          <button id="exportBtn" title="Export current view" class="py-2 px-3 rounded bg-white/5 hover:bg-white/10">Export</button>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+
+        <div class="glass p-4 rounded-lg">
+          <div class="text-sm muted">Total Alerts</div>
+          <div id="kpi-alerts" class="text-2xl font-bold mt-2">—</div>
+          <div class="text-xs muted mt-1">Last 24 hours</div>
+        </div>
+
+        <div class="glass p-4 rounded-lg">
+          <div class="text-sm muted">Open Incidents</div>
+          <div id="kpi-incidents" class="text-2xl font-bold mt-2">—</div>
+          <div class="text-xs muted mt-1">Active</div>
+        </div>
+
+        <div class="glass p-4 rounded-lg">
+          <div class="text-sm muted">Avg Detection (mins)</div>
+          <div id="kpi-mttd" class="text-2xl font-bold mt-2">—</div>
+          <div class="text-xs muted mt-1">Mean Time To Detect</div>
+        </div>
+
+        <div class="glass p-4 rounded-lg">
+          <div class="text-sm muted">Threat Score</div>
+          <div id="kpi-score" class="text-2xl font-bold mt-2">—</div>
+          <div class="text-xs muted mt-1">Weighted risk index</div>
+        </div>
+
+      </div>
+
+      <!-- Charts + Top offenders -->
+      <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left: Alerts over time (line) -->
+        <div class="glass p-4 rounded-lg lg:col-span-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Alerts Over Time</h3>
+            <div class="text-sm muted">Trend</div>
+          </div>
+          <canvas id="alertsChart" height="150" class="mt-4"></canvas>
+        </div>
+
+        <!-- Right: Threat distribution + top offenders -->
+        <div class="glass p-4 rounded-lg">
+          <h3 class="text-lg font-semibold">Threat Distribution</h3>
+          <canvas id="threatPie" height="140" class="mt-3"></canvas>
+
+          <h4 class="mt-6 text-sm font-semibold">Top Offenders</h4>
+          <div class="mt-3 space-y-2">
+            <div id="topOffenders" class="divide-y divide-white/5 text-sm"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recent Alerts Table -->
+      <div class="mt-6 glass p-4 rounded-lg">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Recent Alerts</h3>
+          <div class="text-sm muted">Live feed</div>
+        </div>
+
+        <div class="mt-3 overflow-x-auto">
+          <table class="w-full text-left mt-2">
+            <thead class="text-xs text-white/70">
+              <tr>
+                <th class="p-2">Time</th>
+                <th class="p-2">Source</th>
+                <th class="p-2">Type</th>
+                <th class="p-2">Severity</th>
+                <th class="p-2">Details</th>
+              </tr>
+            </thead>
+            <tbody id="alertsTable" class="text-sm">
+              <!-- rows inserted by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Raw JSON & Controls -->
+      <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div class="glass p-4 rounded-lg">
+          <div class="flex justify-between items-center">
+            <h4 class="font-semibold">Raw Metrics (preview)</h4>
+            <button id="copyMetrics" class="text-xs py-1 px-2 bg-white/5 rounded">Copy</button>
+          </div>
+          <pre id="rawMetrics" class="json mt-3">{} </pre>
+        </div>
+
+        <div class="glass p-4 rounded-lg">
+          <h4 class="font-semibold">Actions</h4>
+          <div class="mt-3 flex flex-col gap-3">
+            <button id="btnClear" class="py-2 px-3 bg-red-600 rounded">Acknowledge All (demo)</button>
+            <button id="btnExport" class="py-2 px-3 bg-white/5 rounded">Download Snapshot (JSON)</button>
+            <button id="btnSettings" class="py-2 px-3 bg-white/5 rounded">Settings</button>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- SCRIPTS: Logic, charts and mock data -->
+  <script>
+    // ========== CONFIG ==========
+    // Set these to your real API endpoints (Workers / backend). For now, the code uses
+    // mockFetchData() when the endpoint is missing.
+    const API_BASE = ""; // e.g. "https://ioc-rasecurity.workers.dev" or "" to use mock
+    const ENDPOINTS = {
+      metrics: API_BASE ? `${API_BASE}/api/metrics` : null,
+      alerts: API_BASE ? `${API_BASE}/api/alerts` : null,
+      top: API_BASE ? `${API_BASE}/api/top_offenders` : null,
+      distribution: API_BASE ? `${API_BASE}/api/distribution` : null
+    };
+
+    // ========= Utils ==========
+    function el(tag, props={}, ...children){
+      const node = document.createElement(tag);
+      Object.entries(props).forEach(([k,v])=>{
+        if(k==='class') node.className = v;
+        else node.setAttribute(k,v);
+      });
+      children.flat().forEach(c => {
+        if(typeof c === 'string') node.appendChild(document.createTextNode(c));
+        else if(c) node.appendChild(c);
+      });
+      return node;
+    }
+
+    // ========= Chart instances ==========
+    let alertsChart = null;
+    let threatPie = null;
+
+    // ========= Initialize charts with empty data ==========
+    function initCharts(){
+      const ctx = document.getElementById('alertsChart').getContext('2d');
+      alertsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Alerts',
+            data: [],
+            borderColor: '#7b61ff',
+            backgroundColor: 'rgba(123,97,255,0.16)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          scales: {
+            x: { display: true },
+            y: { beginAtZero:true }
+          },
+          plugins: { legend: { display:false } }
+        }
+      });
+
+      const ctx2 = document.getElementById('threatPie').getContext('2d');
+      threatPie = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: ['#ef4444','#f59e0b','#10b981','#6366f1','#a78bfa']
+          }]
+        },
+        options: {
+          responsive:true,
+          maintainAspectRatio:true,
+          plugins:{legend:{position:'bottom', labels:{color:'#cbd5e1'}}}
+        }
+      });
+    }
+
+    // ========= Data loading (mock or real) ==========
+    async function fetchData(){
+      const range = document.getElementById('timeRange').value;
+      // if endpoints not defined, use mock
+      if(!ENDPOINTS.metrics) {
+        return mockFetchData(range);
+      }
+
+      // otherwise, call real APIs (example multiple endpoints)
+      try {
+        const [metricsRes, alertsRes, topRes, distRes] = await Promise.all([
+          fetch(ENDPOINTS.metrics + '?range=' + range).then(r=>r.json()),
+          fetch(ENDPOINTS.alerts + '?range=' + range).then(r=>r.json()),
+          fetch(ENDPOINTS.top + '?range=' + range).then(r=>r.json()),
+          fetch(ENDPOINTS.distribution + '?range=' + range).then(r=>r.json()),
+        ]);
+        return { metrics: metricsRes, alerts: alertsRes, top: topRes, distribution: distRes };
+      } catch (e) {
+        console.error("API fetch error", e);
+        // fallback to mock
+        return mockFetchData(range);
+      }
+    }
+
+    // ======= Mock data generator =========
+    function mockFetchData(range){
+      // small deterministic generator for demo
+      const now = Date.now();
+      const points = 24;
+      const labels = Array.from({length:points}).map((_,i)=>{
+        const d = new Date(now - ((points-i) * 60 * 60 * 1000));
+        return d.getHours() + ':00';
+      });
+      const series = labels.map((_,i)=> Math.max(0, Math.round(20 + 40*Math.sin(i/3) + (Math.random()*20))));
+      const metrics = {
+        totalAlerts: series.reduce((a,b)=>a+b,0),
+        openIncidents: Math.max(1, Math.round(series[series.length-1]/8)),
+        avgMTTD: Math.round(5 + Math.random()*15),
+        threatScore: Math.round(30 + Math.random()*50),
+        timeline: { labels, series }
+      };
+      const alerts = Array.from({length:10}).map((_,i)=>{
+        const sev = ['low','medium','high','critical'][Math.floor(Math.random()*4)];
+        return {
+          time: new Date(now - i*600000).toISOString(),
+          source: `192.168.1.${10+i}`,
+          type: ['ip', 'domain','hash'][Math.floor(Math.random()*3)],
+          severity: sev,
+          details: `Detected suspicious activity - signature ${1000+i}`
+        };
+      });
+      const top = [
+        { source: '203.0.113.5', count: 129, last: '2025-12-07T12:40:00Z' },
+        { source: '198.51.100.22', count: 89, last: '2025-12-07T11:10:00Z' },
+        { source: '8.8.8.8', count: 44, last: '2025-12-07T12:02:00Z' }
+      ];
+      const distribution = { labels:['malicious','suspicious','phishing','benign'], values:[45, 20, 10, 25] };
+      return { metrics, alerts, top, distribution };
+    }
+
+    // ========= Render functions ==========
+    function renderKPIs(metrics){
+      document.getElementById('kpi-alerts').textContent = metrics.totalAlerts ?? '—';
+      document.getElementById('kpi-incidents').textContent = metrics.openIncidents ?? '—';
+      document.getElementById('kpi-mttd').textContent = metrics.avgMTTD ?? '—';
+      document.getElementById('kpi-score').textContent = metrics.threatScore ?? '—';
+      document.getElementById('rawMetrics').textContent = JSON.stringify(metrics, null, 2);
+    }
+
+    function updateCharts(metrics, distribution){
+      // line chart
+      alertsChart.data.labels = metrics.timeline.labels;
+      alertsChart.data.datasets[0].data = metrics.timeline.series;
+      alertsChart.update();
+
+      // donut
+      threatPie.data.labels = distribution.labels;
+      threatPie.data.datasets[0].data = distribution.values;
+      threatPie.update();
+    }
+
+    function renderTopOffenders(top){
+      const el = document.getElementById('topOffenders');
+      el.innerHTML = '';
+      top.forEach(item => {
+        const row = el.appendChild(el = document.createElement('div'));
+      });
+      // simpler manual building:
+      const container = document.getElementById('topOffenders');
+      container.innerHTML = '';
+      top.forEach(t=> {
+        const node = el('div', {class:'py-2 flex justify-between items-center'});
+        node.appendChild(el('div', {class:'text-sm'}, t.source + ' '));
+        node.appendChild(el('div', {class:'text-xs muted'}, `${t.count} alerts • last ${new Date(t.last).toLocaleString()}`));
+        container.appendChild(node);
+      });
+    }
+
+    function renderAlertsTable(alerts){
+      const tbody = document.getElementById('alertsTable');
+      tbody.innerHTML = '';
+      alerts.forEach(a=>{
+        const tr = document.createElement('tr');
+        tr.className = 'table-row';
+        tr.innerHTML = `
+          <td class="p-2"><div class="text-xs muted">${new Date(a.time).toLocaleString()}</div></td>
+          <td class="p-2"><div class="font-semibold">${a.source}</div></td>
+          <td class="p-2"><div class="text-sm">${a.type}</div></td>
+          <td class="p-2"><div class="text-sm ${a.severity==='critical'?'text-red-400': a.severity==='high'?'text-orange-300':'text-yellow-200'}">${a.severity.toUpperCase()}</div></td>
+          <td class="p-2"><div class="text-xs muted">${a.details}</div></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ========= Actions ==========
+    async function reloadDashboard(){
+      document.getElementById('refreshBtn').disabled = true;
+      const data = await fetchData();
+      renderKPIs(data.metrics);
+      updateCharts(data.metrics, data.distribution);
+      renderTopOffenders(data.top);
+      renderAlertsTable(data.alerts);
+      document.getElementById('refreshBtn').disabled = false;
+    }
+
+    // export snapshot JSON
+    document.getElementById('btnExport').addEventListener('click', ()=>{
+      const obj = {
+        metrics: JSON.parse(document.getElementById('rawMetrics').textContent || '{}'),
+        snapshotAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `rasecurity_snapshot_${Date.now()}.json`; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // copy metrics
+    document.getElementById('copyMetrics').addEventListener('click', ()=>{
+      navigator.clipboard.writeText(document.getElementById('rawMetrics').textContent || '{}');
+      alert('Metrics copied to clipboard');
+    });
+
+    // quick acknowledge (demo)
+    document.getElementById('btnClear').addEventListener('click', ()=> {
+      alert('Acknowledge action (demo) — integrate with backend to perform ack');
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', reloadDashboard);
+    document.getElementById('timeRange').addEventListener('change', reloadDashboard);
+
+    // init
+    initCharts();
+    reloadDashboard();
+
+  </script>
+
+</body>
+</html>

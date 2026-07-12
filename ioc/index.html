@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>IOC Intelligence Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="icon" href="/images/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+:root{
+  --bg:#020617;--panel:#0f172a;--border:#1e293b;
+  --purple:#7c3aed;--green:#22c55e;
+  --yellow:#f59e0b;--red:#ef4444;
+  --text:#e5e7eb;--muted:#94a3b8;
+}
+
+body{
+  margin:0;
+  font-family:Inter,system-ui,sans-serif;
+  background:radial-gradient(circle at top,#020617,#000);
+  color:var(--text)
+}
+
+header{text-align:center;padding:150px 20px 30px}
+header h1{font-size:34px;color:#a78bfa}
+header p{color:var(--muted)}
+
+.glass{
+  background:rgba(255,255,255,.06);
+  backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.09)
+}
+
+.ioc-box{
+  max-width:760px;
+  margin:30px auto;
+  background:linear-gradient(180deg,#0f172a,#020617);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:30px
+}
+
+.ioc-row{display:flex;gap:14px;margin-top:14px}
+.ioc-row input{
+  flex:1;padding:16px;border-radius:12px;
+  border:1px solid var(--border);
+  background:#020617;color:var(--text)
+}
+.ioc-row button{
+  padding:16px 28px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#7c3aed,#a78bfa);
+  color:#fff;font-weight:700;cursor:pointer
+}
+
+#errorBox{
+  display:none;
+  max-width:760px;
+  margin:20px auto;
+  background:rgba(239,68,68,.15);
+  border:1px solid var(--red);
+  border-radius:12px;
+  padding:14px;
+  color:#fecaca
+}
+
+.card{
+  background:#0b1220;
+  border-radius:14px;
+  padding:20px;
+  margin:16px auto;
+  max-width:620px
+}
+
+.badge{
+  padding:4px 10px;border-radius:999px;font-size:12px;margin-left:6px
+}
+.HIGH{background:#7f1d1d}
+.MEDIUM{background:#92400e}
+.LOW{background:#064e3b}
+
+.tag{
+  background:#020617;
+  border:1px solid #1e293b;
+  padding:6px 10px;
+  border-radius:10px;
+  margin:4px;
+  display:inline-block;
+  font-size:12px
+}
+
+a{color:#8b5cf6;text-decoration:none}
+</style>
+</head>
+
+<body>
+
+<nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] max-w-6xl glass rounded-2xl px-6 py-3 flex justify-between items-center shadow-xl z-20">
+  <h1 class="text-xl font-bold gradient-text tracking-wide">RA SECURITY</h1>
+  <div class="flex gap-6 text-gray-300 font-semibold">
+      <a href="/" class="hover:text-white">Home</a>
+      <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
+      <a href="/secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="/README.md" class="hover:text-white">Docs</a>
+    </div>
+</nav>
+
+<header>
+  <h1>IOC Intelligence Dashboard</h1>
+  <p>VirusTotal · AbuseIPDB · AlienVault OTX</p>
+</header>
+
+<div class="ioc-box">
+  <label>Enter IOC</label>
+  <div class="ioc-row">
+    <input id="ioc" placeholder="IP / Domain / Hash">
+    <button onclick="run()">Run IOC Check</button>
+  </div>
+</div>
+
+<div id="errorBox"></div>
+<div id="result"></div>
+
+<script>
+async function run(){
+  const ioc=document.getElementById("ioc").value.trim();
+  const result=document.getElementById("result");
+  const error=document.getElementById("errorBox");
+
+  result.innerHTML="";
+  error.style.display="none";
+
+  if(!ioc){
+    error.textContent="IOC is required";
+    error.style.display="block";
+    return;
+  }
+
+  try{
+    const r=await fetch(`/api/ioc?ioc=${encodeURIComponent(ioc)}`);
+    if(!r.ok) throw new Error("API error");
+    const d=await r.json();
+
+    const s=d.sources||{};
+    result.innerHTML=`
+      ${block("VirusTotal",s.virustotal)}
+      ${block("AbuseIPDB",s.abuseipdb)}
+      ${otxBlock(s.otx,ioc)}
+    `;
+  }catch(e){
+    console.error(e);
+    error.textContent="Failed to analyze IOC";
+    error.style.display="block";
+  }
+}
+
+function block(name,o={}){
+  return `<div class="card">
+    <b>${name}</b>
+    <span class="badge ${o.verdict||"LOW"}">${o.verdict||"LOW"}</span>
+    <h2>${o.malicious!==undefined ? `${o.malicious}/${o.total}` : (o.score ?? 0)}</h2>
+    <a href="${o.link||"#"}" target="_blank">View source ↗</a>
+  </div>`;
+}
+
+function otxBlock(o={},ioc){
+  const tags=(Array.isArray(o.tags)?o.tags:[])
+    .map(t=>`<span class="tag">${t}</span>`).join("");
+
+  return `<div class="card">
+    <b>AlienVault OTX</b>
+    <span class="badge ${o.verdict||"LOW"}">${o.verdict||"LOW"}</span>
+    <h2>${o.pulses||0} pulses</h2>
+    <div>${tags}</div>
+    <a href="https://otx.alienvault.com/indicator/ip/${ioc}" target="_blank">
+      View source ↗
+    </a>
+  </div>`;
+}
+</script>
+
+</body>
+</html>

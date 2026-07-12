@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RA Security – Proactive Defense</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="/images/favicon.ico">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind (for premium UI styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #060a12;
+      color: #e5e7eb;
+      overflow-x: hidden;
+    }
+
+    /* Glass effect for panel */
+    .glass {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+    /* Vanta background container */
+    #vanta-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+    }
+
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(90deg, #7b5cff, #ff5fb6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hover-card:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 30px rgba(139,92,255,0.25);
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- Vanta Animated Background -->
+  <div id="vanta-bg"></div>
+
+  <!-- NAVBAR -->
+  <nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] max-w-6xl glass rounded-2xl px-6 py-3 flex justify-between items-center shadow-xl z-20">
+    <h1 class="text-xl font-bold gradient-text tracking-wide">RA SECURITY</h1>
+    <div class="flex gap-6 text-gray-300 font-semibold">
+      <a href="/" class="hover:text-white">Home</a>
+      <a href="/ioc/index.html" class="hover:text-white">IOC Checker</a>
+      <a href="secdashboard.html" class="hover:text-white">Dashboard</a>
+      <a href="README.md" class="hover:text-white">Docs</a>
+    </div>
+  </nav>
+
+  <!-- HERO SECTION -->
+  <section class="relative min-h-screen flex items-center">
+    <div class="max-w-5xl mx-auto px-8">
+
+      <div class="glass rounded-3xl p-12 shadow-2xl">
+
+        <h1 class="text-6xl md:text-7xl font-extrabold gradient-text leading-tight">
+          PROACTIVE <br> CYBER DEFENSE
+        </h1>
+
+        <p class="mt-4 text-xl text-gray-300 max-w-3xl">
+          Combining advanced human intelligence with next-gen AI threat detection.  
+          We hunt threats before they hunt you.
+        </p>
+
+        <div class="mt-8 flex gap-4">
+          <a href="/ioc/index.html"
+            class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg">
+            Open IOC Intelligence →
+          </a>
+
+          <a href="secdashboard.html"
+            class="px-6 py-3 rounded-xl glass border border-gray-600 text-white hover:bg-white/10 font-semibold">
+            Security Dashboard →
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FEATURE CARDS -->
+  <section class="py-20 px-8 max-w-6xl mx-auto">
+
+    <h2 class="text-4xl font-bold gradient-text mb-10 text-center">RA Security Ecosystem</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">IOC Intelligence</h3>
+        <p class="text-gray-400">Deep reputation analysis across VT, AbuseIPDB, OTX & MXToolbox.</p>
+      </div>
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">Threat Dashboard</h3>
+        <p class="text-gray-400">Monitor log sources, anomalies, and incident trends securely.</p>
+      </div>
+
+      <div class="glass p-6 rounded-2xl hover-card transition transform shadow-xl">
+        <h3 class="text-2xl font-bold mb-2">AI-Assisted Defense</h3>
+        <p class="text-gray-400">Machine-learning powered enrichment and risk scoring.</p>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="mt-20 text-center text-gray-500 pb-10">
+    © 2025 RA Security — Proactive Cyber Defense
+  </footer>
+
+
+  <!-- Vanta Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://www.vantajs.com/dist/vanta.halo.min.js"></script>
+
+  <script>
+    VANTA.HALO({
+      el: "#vanta-bg",
+      baseColor: 0x133a86,
+      backgroundColor: 0x060a12,
+      amplitude: 1.2,
+      size: 1.1,
+      speed: 0.9,
+      mouseControls: true,
+      touchControls: true,
+    });
+  </script>
+
+</body>
+</html>
