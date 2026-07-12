@@ -1,0 +1,10 @@
+# Copy file ini jadi ".dev.vars" (tanpa .example) lalu isi dengan API key asli kamu.
+# ".dev.vars" TIDAK boleh di-commit ke git (sudah masuk .gitignore).
+
+VT_API_KEY=isi_api_key_virustotal_disini
+ABUSEIPDB_API_KEY=isi_api_key_abuseipdb_disini
+OTX_API_KEY=isi_api_key_otx_disini
+
+# String acak panjang untuk signing session/JWT. Generate dengan:
+# openssl rand -base64 48
+SESSION_SECRET=ganti_dengan_random_string_panjang_dan_acak

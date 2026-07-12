@@ -1,0 +1,72 @@
+---
+interface Props {
+  user?: { full_name: string } | null;
+}
+const { user = null } = Astro.props;
+
+const links = [
+  { href: '/', label: 'Home' },
+  { href: '/ioc-checker', label: 'IOC Checker' },
+  { href: '/news', label: 'Berita CVE & Ransomware' },
+];
+---
+<nav class="navbar">
+  <a href="/" class="brand">Rekan Siber</a>
+  <div class="links">
+    {links.map((link) => <a href={link.href}>{link.label}</a>)}
+    {user ? (
+      <>
+        <a href="/dashboard">Dashboard</a>
+        <button id="logout-btn" type="button">Logout ({user.full_name})</button>
+      </>
+    ) : (
+      <a href="/login">Login Tim SOC</a>
+    )}
+  </div>
+</nav>
+
+<style>
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #2a2f3a;
+  }
+  .brand {
+    font-weight: 700;
+    text-decoration: none;
+    color: inherit;
+  }
+  .links {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .links a {
+    text-decoration: none;
+    color: inherit;
+    opacity: 0.8;
+  }
+  .links a:hover {
+    opacity: 1;
+  }
+  .links button#logout-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.8;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+  }
+  .links button#logout-btn:hover {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+</script>

@@ -1,0 +1,52 @@
+---
+import Navbar from '../components/Navbar.astro';
+---
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login Tim SOC — Rekan Siber</title>
+  </head>
+  <body>
+    <Navbar />
+    <main>
+      <h1>Login Tim SOC</h1>
+      <p>Halaman ini khusus untuk anggota tim SOC — bulk checking, dashboard usage, dan report bulanan.</p>
+
+      <form id="login-form">
+        <input name="email" type="email" placeholder="Email" required />
+        <input name="password" type="password" placeholder="Password" required />
+        <button type="submit">Masuk</button>
+      </form>
+      <p id="login-error" role="alert"></p>
+    </main>
+
+    <script>
+      const form = document.getElementById('login-form') as HTMLFormElement;
+      const errorEl = document.getElementById('login-error')!;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorEl.textContent = '';
+
+        const formData = new FormData(form);
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.get('email'),
+            password: formData.get('password'),
+          }),
+        });
+
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          errorEl.textContent = data.error ?? 'Login gagal';
+          return;
+        }
+
+        window.location.href = '/dashboard';
+      });
+    </script>
+  </body>
+</html>

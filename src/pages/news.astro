@@ -1,0 +1,28 @@
+---
+import Navbar from '../components/Navbar.astro';
+// Server-side fetch ke endpoint kita sendiri saat halaman di-render
+const res = await Astro.locals.runtime.env.NEWS_CACHE.get('cve-latest', 'json');
+const news = (res as { items: Array<{ title: string; link: string; source: string }> } | null)?.items ?? [];
+---
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Berita CVE & Ransomware — Rekan Siber</title>
+  </head>
+  <body>
+    <Navbar />
+    <main>
+      <h1>Berita CVE & Ransomware Terbaru</h1>
+      {news.length === 0 && <p>Belum ada data. Cron job pengambil berita akan kita bangun di tahap berikutnya.</p>}
+      <ul>
+        {news.map((item) => (
+          <li>
+            <a href={item.link} target="_blank" rel="noopener">{item.title}</a>
+            <span> — {item.source}</span>
+          </li>
+        ))}
+      </ul>
+    </main>
+  </body>
+</html>

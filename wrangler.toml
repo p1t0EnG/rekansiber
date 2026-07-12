@@ -1,0 +1,25 @@
+name = "rekansiber"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+# ---- Database (D1) ----
+# Jalankan dulu: wrangler d1 create rekansiber-db
+# lalu copy "database_id" yang muncul ke sini
+[[d1_databases]]
+binding = "DB"
+database_name = "rekansiber-db"
+database_id = "10e36740-f2ea-4ca1-bd49-d7dc569d6a4a"
+
+# ---- Cache untuk berita CVE / ransomware (KV) ----
+# Jalankan dulu: wrangler kv namespace create NEWS_CACHE
+# lalu copy "id" yang muncul ke sini
+[[kv_namespaces]]
+binding = "NEWS_CACHE"
+id = "52cde55653a14feda15e840968fc30cc"
+
+# Non-secret vars boleh di sini. Untuk API key (VT, AbuseIPDB, OTX) JANGAN taruh
+# di sini -- pakai `.dev.vars` untuk local dan dashboard Cloudflare (encrypted)
+# untuk production. Lihat README.md bagian "Environment Variables".
+[vars]
+APP_ENV = "development"

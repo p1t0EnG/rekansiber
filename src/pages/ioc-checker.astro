@@ -1,0 +1,52 @@
+---
+import Navbar from '../components/Navbar.astro';
+---
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IOC Checker — Rekan Siber</title>
+  </head>
+  <body>
+    <Navbar />
+    <main>
+      <h1>IOC Checker</h1>
+      <p>Masukkan IP, domain, hash, atau URL untuk dicek ke VirusTotal, AbuseIPDB, dan OTX.</p>
+
+      <form id="ioc-form">
+        <select id="ioc-type" name="type">
+          <option value="ip">IP Address</option>
+          <option value="domain">Domain</option>
+          <option value="hash">File Hash</option>
+          <option value="url">URL</option>
+        </select>
+        <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required />
+        <button type="submit">Cek Sekarang</button>
+      </form>
+
+      <pre id="result"></pre>
+    </main>
+
+    <script>
+      // Ini contoh minimal manggil endpoint Hono kita (/api/ioc/check).
+      // Nanti akan diganti dengan tampilan hasil yang lebih rapi (kartu, badge verdict, dll).
+      const form = document.getElementById('ioc-form') as HTMLFormElement;
+      const resultEl = document.getElementById('result')!;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const type = (document.getElementById('ioc-type') as unknown as HTMLSelectElement).value;
+        const value = (document.getElementById('ioc-value') as HTMLInputElement).value;
+
+        resultEl.textContent = 'Memeriksa...';
+        const res = await fetch('/api/ioc/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, value }),
+        });
+        const data = await res.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      });
+    </script>
+  </body>
+</html>
