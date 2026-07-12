@@ -1,0 +1,25 @@
+---
+import Navbar from '../components/Navbar.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  user?: { full_name: string } | null;
+}
+
+const { title, user = null } = Astro.props;
+---
+
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — Rekan Siber</title>
+  </head>
+  <body>
+    <Navbar user={user} />
+    <div class="container">
+      <slot />
+    </div>
+  </body>
+</html>

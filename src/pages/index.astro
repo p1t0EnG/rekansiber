@@ -1,26 +1,87 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rekan Siber — Proactive Cyber Defense</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Rekan Siber</h1>
-      <p>
-        Cek reputasi IP, domain, hash, dan URL sebelum jadi korban phishing —
-        gratis untuk publik, plus fitur lengkap untuk tim SOC.
-      </p>
-      <a href="/ioc-checker">Mulai cek IOC →</a>
-    </main>
-  </body>
-</html>
+
+<Layout title="Home" user={user}>
+  <section class="hero card">
+    <span class="eyebrow">Rekan Siber</span>
+    <h1>Proactive Cyber Defense untuk Tim Kamu</h1>
+    <p class="lead">
+      Cek reputasi IP, domain, hash, dan URL dalam hitungan detik -- gratis untuk publik, plus
+      dashboard, bulk checking, dan report lengkap untuk tim SOC.
+    </p>
+    <div class="btn-row">
+      <a href="/ioc-checker" class="btn">Mulai cek IOC →</a>
+      <a href="/news" class="btn btn-secondary">Lihat berita terbaru</a>
+    </div>
+  </section>
+
+  <div class="feature-grid">
+    <a href="/ioc-checker" class="card feature-card">
+      <h2>IOC Checker</h2>
+      <p>Validasi IP, domain, hash, dan URL lewat VirusTotal, AbuseIPDB, dan OTX sekaligus.</p>
+    </a>
+    <a href="/news" class="card feature-card">
+      <h2>Berita CVE &amp; Ransomware</h2>
+      <p>Update otomatis tiap 6 jam dari The Hacker News dan BleepingComputer.</p>
+    </a>
+    <a href="/login" class="card feature-card">
+      <h2>Portal Tim SOC</h2>
+      <p>Bulk checking, dashboard usage, report bulanan, dan template phishing report.</p>
+    </a>
+  </div>
+</Layout>
+
+<style>
+  .hero {
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+  }
+  .eyebrow {
+    display: inline-block;
+    color: var(--brand);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+  }
+  .hero h1 {
+    font-size: 2rem;
+    max-width: 32rem;
+  }
+  .lead {
+    color: var(--text-muted);
+    max-width: 36rem;
+    margin: 0.5rem 0 1.5rem;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+  }
+  .feature-card {
+    margin-bottom: 0;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .feature-card:hover {
+    border-color: var(--brand);
+    transform: translateY(-2px);
+  }
+  .feature-card h2 {
+    font-size: 1rem;
+    color: var(--text);
+  }
+  .feature-card p {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    margin: 0;
+  }
+</style>

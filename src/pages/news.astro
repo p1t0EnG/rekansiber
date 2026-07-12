@@ -1,34 +1,57 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
 
-// Server-side fetch ke endpoint kita sendiri saat halaman di-render
+// Server-side fetch ke KV cache-nya sendiri saat halaman di-render
 const res = await Astro.locals.runtime.env.NEWS_CACHE.get('cve-latest', 'json');
-const news = (res as { items: Array<{ title: string; link: string; source: string }> } | null)?.items ?? [];
+const news = (res as { items: Array<{ title: string; link: string; source: string; pubDate?: string }> } | null)?.items ?? [];
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Berita CVE & Ransomware — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Berita CVE & Ransomware Terbaru</h1>
-      {news.length === 0 && <p>Belum ada data cache. Cron job pengambil berita jalan tiap 6 jam.</p>}
-      <ul>
-        {news.map((item) => (
-          <li>
-            <a href={item.link} target="_blank" rel="noopener">{item.title}</a>
-            <span> — {item.source}</span>
-          </li>
-        ))}
-      </ul>
-    </main>
-  </body>
-</html>
+
+<Layout title="Berita CVE & Ransomware" user={user}>
+  <div class="page-header">
+    <h1>Berita CVE &amp; Ransomware Terbaru</h1>
+    <p>Diambil otomatis tiap 6 jam dari The Hacker News dan BleepingComputer.</p>
+  </div>
+
+  {news.length === 0 && <p class="empty-state">Belum ada data cache. Cron job pengambil berita jalan tiap 6 jam.</p>}
+
+  <div class="news-list">
+    {news.map((item) => (
+      <a href={item.link} target="_blank" rel="noopener" class="card news-item">
+        <span class="badge badge-unknown">{item.source}</span>
+        <h2>{item.title}</h2>
+      </a>
+    ))}
+  </div>
+
+  <style>
+    .news-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .news-item {
+      margin-bottom: 0;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      align-items: baseline;
+      gap: 0.9rem;
+      padding: 1rem 1.25rem;
+      transition: border-color 0.15s ease;
+    }
+    .news-item:hover {
+      border-color: var(--brand);
+    }
+    .news-item h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+  </style>
+</Layout>

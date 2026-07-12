@@ -1,5 +1,5 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { listPhishingReports } from '../server/phishing/reports';
 
@@ -13,162 +13,178 @@ if (!user) {
 
 const reports = await listPhishingReports(db);
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Report Phishing — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Report Phishing ke Hosting Provider</h1>
-      <p>
-        Buat draft laporan, generate template email abuse report, lalu kirim manual lewat email
-        kamu sendiri. Update status di sini setelah terkirim / selesai ditangani provider.
-      </p>
 
-      <h2>Buat Laporan Baru</h2>
-      <form id="phishing-form">
-        <label for="target-domain">Domain/URL phishing:</label><br />
-        <input id="target-domain" type="text" required placeholder="contoh: phishing-bank-abc.xyz" /><br /><br />
-        <label for="hosting-email">Email abuse hosting provider (opsional):</label><br />
-        <input id="hosting-email" type="email" placeholder="abuse@hostingprovider.com" /><br /><br />
-        <label for="notes">Catatan/bukti (opsional):</label><br />
-        <textarea id="notes" rows="3"></textarea><br /><br />
-        <button type="submit">Buat Draft</button>
-      </form>
-      <p id="form-status" role="status"></p>
+<Layout title="Report Phishing" user={user}>
+  <div class="page-header">
+    <h1>Report Phishing ke Hosting Provider</h1>
+    <p>
+      Buat draft laporan, generate template email abuse report, lalu kirim manual lewat email
+      kamu sendiri. Update status di sini setelah terkirim / selesai ditangani provider.
+    </p>
+  </div>
 
-      <h2>Daftar Laporan</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Domain</th>
-            <th>Hosting Email</th>
-            <th>Status</th>
-            <th>Dibuat Oleh</th>
-            <th>Tanggal</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reports.map((r) => (
-            <tr>
-              <td>{r.target_domain}</td>
-              <td>{r.hosting_email ?? '-'}</td>
-              <td>{r.status}</td>
-              <td>{r.reporter_name}</td>
-              <td>{r.created_at.slice(0, 10)}</td>
-              <td>
-                <button class="view-template-btn" data-id={r.id}>Lihat Template</button>
-                {r.status === 'draft' && (
-                  <button class="mark-status-btn" data-id={r.id} data-status="sent">
-                    Tandai Terkirim
-                  </button>
-                )}
-                {r.status === 'sent' && (
-                  <button class="mark-status-btn" data-id={r.id} data-status="resolved">
-                    Tandai Selesai
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {reports.length === 0 && (
-            <tr>
-              <td colspan="6">Belum ada laporan.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      <div id="template-modal" style="display:none; margin-top:1.5rem;">
-        <h3>Template Email</h3>
-        <textarea
-          id="template-text"
-          rows="16"
-          style="width:100%; max-width:700px; font-family:monospace;"
-          readonly></textarea>
-        <br />
-        <button id="copy-template-btn" type="button">Copy ke Clipboard</button>
-        <button id="close-template-btn" type="button">Tutup</button>
+  <div class="card">
+    <h2>Buat Laporan Baru</h2>
+    <form id="phishing-form">
+      <div class="field">
+        <label for="target-domain">Domain/URL phishing</label>
+        <input id="target-domain" type="text" required placeholder="contoh: phishing-bank-abc.xyz" />
       </div>
-    </main>
+      <div class="field">
+        <label for="hosting-email">Email abuse hosting provider (opsional)</label>
+        <input id="hosting-email" type="email" placeholder="abuse@hostingprovider.com" />
+      </div>
+      <div class="field">
+        <label for="notes">Catatan/bukti (opsional)</label>
+        <textarea id="notes" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn">Buat Draft</button>
+    </form>
+    <p id="form-status" class="status-message" role="status"></p>
+  </div>
 
-    <style>
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        max-width: 900px;
-        margin-bottom: 1.5rem;
+  <div class="card">
+    <h2>Daftar Laporan</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Hosting Email</th>
+          <th>Status</th>
+          <th>Dibuat Oleh</th>
+          <th>Tanggal</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {reports.map((r) => (
+          <tr>
+            <td>{r.target_domain}</td>
+            <td>{r.hosting_email ?? '-'}</td>
+            <td><span class={`badge badge-${r.status}`}>{r.status}</span></td>
+            <td>{r.reporter_name}</td>
+            <td>{r.created_at.slice(0, 10)}</td>
+            <td class="actions-cell">
+              <button class="view-template-btn btn btn-secondary btn-sm" data-id={r.id}>Lihat Template</button>
+              {r.status === 'draft' && (
+                <button class="mark-status-btn btn btn-secondary btn-sm" data-id={r.id} data-status="sent">
+                  Tandai Terkirim
+                </button>
+              )}
+              {r.status === 'sent' && (
+                <button class="mark-status-btn btn btn-secondary btn-sm" data-id={r.id} data-status="resolved">
+                  Tandai Selesai
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {reports.length === 0 && <p class="empty-state">Belum ada laporan.</p>}
+  </div>
+
+  <div id="template-modal" class="modal-overlay" style="display:none;">
+    <div class="card modal-box">
+      <h2>Template Email</h2>
+      <textarea id="template-text" rows="16" readonly></textarea>
+      <div class="btn-row" style="margin-top:1rem;">
+        <button id="copy-template-btn" type="button" class="btn">Copy ke Clipboard</button>
+        <button id="close-template-btn" type="button" class="btn btn-secondary">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .actions-cell {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .btn-sm {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.82rem;
+    }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 50;
+    }
+    .modal-box {
+      width: 100%;
+      max-width: 640px;
+      max-height: 85vh;
+      overflow-y: auto;
+      margin-bottom: 0;
+    }
+    .modal-box textarea {
+      width: 100%;
+    }
+  </style>
+
+  <script>
+    const form = document.getElementById('phishing-form') as HTMLFormElement;
+    const formStatus = document.getElementById('form-status')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const targetDomain = (document.getElementById('target-domain') as HTMLInputElement).value;
+      const hostingEmail = (document.getElementById('hosting-email') as HTMLInputElement).value;
+      const notes = (document.getElementById('notes') as HTMLTextAreaElement).value;
+
+      formStatus.textContent = 'Menyimpan...';
+      const res = await fetch('/api/phishing-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_domain: targetDomain, hosting_email: hostingEmail, notes }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        formStatus.textContent = data.error ?? 'Gagal menyimpan laporan';
+        return;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.5rem;
-        border-bottom: 1px solid #2a2f3a;
-      }
-      button {
-        margin-right: 0.5rem;
-      }
-    </style>
 
-    <script>
-      const form = document.getElementById('phishing-form') as HTMLFormElement;
-      const formStatus = document.getElementById('form-status')!;
+      window.location.reload();
+    });
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const targetDomain = (document.getElementById('target-domain') as HTMLInputElement).value;
-        const hostingEmail = (document.getElementById('hosting-email') as HTMLInputElement).value;
-        const notes = (document.getElementById('notes') as HTMLTextAreaElement).value;
+    const templateModal = document.getElementById('template-modal') as HTMLDivElement;
+    const templateText = document.getElementById('template-text') as HTMLTextAreaElement;
 
-        formStatus.textContent = 'Menyimpan...';
-        const res = await fetch('/api/phishing-reports', {
-          method: 'POST',
+    document.querySelectorAll<HTMLButtonElement>('.view-template-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const res = await fetch(`/api/phishing-reports/${btn.dataset.id}/template`);
+        templateText.value = await res.text();
+        templateModal.style.display = 'flex';
+      });
+    });
+
+    document.getElementById('close-template-btn')?.addEventListener('click', () => {
+      templateModal.style.display = 'none';
+    });
+
+    templateModal.addEventListener('click', (e) => {
+      if (e.target === templateModal) templateModal.style.display = 'none';
+    });
+
+    document.getElementById('copy-template-btn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(templateText.value);
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.mark-status-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await fetch(`/api/phishing-reports/${btn.dataset.id}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target_domain: targetDomain, hosting_email: hostingEmail, notes }),
+          body: JSON.stringify({ status: btn.dataset.status }),
         });
-
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          formStatus.textContent = data.error ?? 'Gagal menyimpan laporan';
-          return;
-        }
-
         window.location.reload();
       });
-
-      const templateModal = document.getElementById('template-modal') as HTMLDivElement;
-      const templateText = document.getElementById('template-text') as HTMLTextAreaElement;
-
-      document.querySelectorAll<HTMLButtonElement>('.view-template-btn').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const res = await fetch(`/api/phishing-reports/${btn.dataset.id}/template`);
-          templateText.value = await res.text();
-          templateModal.style.display = 'block';
-        });
-      });
-
-      document.getElementById('close-template-btn')?.addEventListener('click', () => {
-        templateModal.style.display = 'none';
-      });
-
-      document.getElementById('copy-template-btn')?.addEventListener('click', () => {
-        navigator.clipboard.writeText(templateText.value);
-      });
-
-      document.querySelectorAll<HTMLButtonElement>('.mark-status-btn').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await fetch(`/api/phishing-reports/${btn.dataset.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: btn.dataset.status }),
-          });
-          window.location.reload();
-        });
-      });
-    </script>
-  </body>
-</html>
+    });
+  </script>
+</Layout>

@@ -1,5 +1,5 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { getDashboardStats } from '../server/dashboard/stats';
 
@@ -12,87 +12,90 @@ if (!user) {
 }
 
 const { summary, daily } = await getDashboardStats(db);
+
+const totals = summary.reduce(
+  (acc, s) => ({
+    checks: acc.checks + s.total_checks,
+    malicious: acc.malicious + s.malicious_count,
+    suspicious: acc.suspicious + s.suspicious_count,
+    clean: acc.clean + s.clean_count,
+  }),
+  { checks: 0, malicious: 0, suspicious: 0, clean: 0 },
+);
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dashboard — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Dashboard</h1>
-      <p>Selamat datang, {user.full_name} ({user.role}).</p>
 
-      <h2>Ringkasan per Anggota</h2>
-      <table>
-        <thead>
+<Layout title="Dashboard" user={user}>
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Selamat datang, {user.full_name} ({user.role}).</p>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">{totals.checks}</div>
+      <div class="stat-label">Total Pengecekan</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--danger);">{totals.malicious}</div>
+      <div class="stat-label">Malicious</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--warning);">{totals.suspicious}</div>
+      <div class="stat-label">Suspicious</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--success);">{totals.clean}</div>
+      <div class="stat-label">Clean</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ringkasan per Anggota</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Nama</th>
+          <th>Total Cek</th>
+          <th>Malicious</th>
+          <th>Suspicious</th>
+          <th>Clean</th>
+        </tr>
+      </thead>
+      <tbody>
+        {summary.map((s) => (
           <tr>
-            <th>Nama</th>
-            <th>Total Cek</th>
-            <th>Malicious</th>
-            <th>Suspicious</th>
-            <th>Clean</th>
+            <td>{s.full_name}</td>
+            <td>{s.total_checks}</td>
+            <td>{s.malicious_count}</td>
+            <td>{s.suspicious_count}</td>
+            <td>{s.clean_count}</td>
           </tr>
-        </thead>
-        <tbody>
-          {summary.map((s) => (
-            <tr>
-              <td>{s.full_name}</td>
-              <td>{s.total_checks}</td>
-              <td>{s.malicious_count}</td>
-              <td>{s.suspicious_count}</td>
-              <td>{s.clean_count}</td>
-            </tr>
-          ))}
-          {summary.length === 0 && (
-            <tr>
-              <td colspan="5">Belum ada data pengecekan dari tim SOC.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        ))}
+      </tbody>
+    </table>
+    {summary.length === 0 && <p class="empty-state">Belum ada data pengecekan dari tim SOC.</p>}
+  </div>
 
-      <h2>Aktivitas 30 Hari Terakhir</h2>
-      <table>
-        <thead>
+  <div class="card">
+    <h2>Aktivitas 30 Hari Terakhir</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Tanggal</th>
+          <th>Nama</th>
+          <th>Jumlah Cek</th>
+        </tr>
+      </thead>
+      <tbody>
+        {daily.map((d) => (
           <tr>
-            <th>Tanggal</th>
-            <th>Nama</th>
-            <th>Jumlah Cek</th>
+            <td>{d.day}</td>
+            <td>{d.full_name}</td>
+            <td>{d.count}</td>
           </tr>
-        </thead>
-        <tbody>
-          {daily.map((d) => (
-            <tr>
-              <td>{d.day}</td>
-              <td>{d.full_name}</td>
-              <td>{d.count}</td>
-            </tr>
-          ))}
-          {daily.length === 0 && (
-            <tr>
-              <td colspan="3">Belum ada aktivitas 30 hari terakhir.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </main>
-
-    <style>
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        max-width: 700px;
-        margin-bottom: 2rem;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.5rem;
-        border-bottom: 1px solid #2a2f3a;
-      }
-    </style>
-  </body>
-</html>
+        ))}
+      </tbody>
+    </table>
+    {daily.length === 0 && <p class="empty-state">Belum ada aktivitas 30 hari terakhir.</p>}
+  </div>
+</Layout>

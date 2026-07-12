@@ -1,5 +1,5 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
@@ -12,25 +12,23 @@ if (!user) {
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Report Bulanan — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Report Bulanan</h1>
-      <p>Pilih bulan, lalu download rekap pengecekan IOC per anggota tim dalam format PDF atau Excel.</p>
 
-      <form method="get" action="/api/reports/monthly.pdf">
-        <label for="report-month">Bulan:</label>
+<Layout title="Report Bulanan" user={user}>
+  <div class="page-header">
+    <h1>Report Bulanan</h1>
+    <p>Pilih bulan, lalu download rekap pengecekan IOC per anggota tim dalam format PDF atau Excel.</p>
+  </div>
+
+  <div class="card" style="max-width: 360px;">
+    <form method="get" action="/api/reports/monthly.pdf">
+      <div class="field">
+        <label for="report-month">Bulan</label>
         <input type="month" id="report-month" name="month" value={currentMonth} required />
-        <br /><br />
-        <button type="submit" formaction="/api/reports/monthly.pdf">Download PDF</button>
-        <button type="submit" formaction="/api/reports/monthly.xlsx">Download Excel</button>
-      </form>
-    </main>
-  </body>
-</html>
+      </div>
+      <div class="btn-row">
+        <button type="submit" formaction="/api/reports/monthly.pdf" class="btn">Download PDF</button>
+        <button type="submit" formaction="/api/reports/monthly.xlsx" class="btn btn-secondary">Download Excel</button>
+      </div>
+    </form>
+  </div>
+</Layout>

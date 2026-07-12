@@ -1,74 +1,196 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>IOC Checker — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>IOC Checker</h1>
-      <p>
-        Masukkan IP, domain, hash, atau URL -- type-nya otomatis terdeteksi, lalu dicek ke
-        VirusTotal, AbuseIPDB, dan OTX.
-      </p>
 
-      <form id="ioc-form">
-        <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required autocomplete="off" />
-        <span id="ioc-type-badge"></span>
-        <button type="submit">Cek Sekarang</button>
-      </form>
+<Layout title="IOC Checker" user={user}>
+  <div class="page-header">
+    <h1>IOC Checker</h1>
+    <p>Masukkan IP, domain, hash, atau URL -- type-nya otomatis terdeteksi, lalu dicek ke VirusTotal, AbuseIPDB, dan OTX.</p>
+  </div>
 
-      <pre id="result"></pre>
-    </main>
+  <div class="card">
+    <form id="ioc-form">
+      <div class="field">
+        <label for="ioc-value">Value</label>
+        <div class="input-row">
+          <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required autocomplete="off" />
+          <span id="ioc-type-badge" class="badge" style="display:none;"></span>
+        </div>
+      </div>
+      <button type="submit" class="btn" id="ioc-submit">Cek Sekarang</button>
+    </form>
+  </div>
 
-    <script>
-      import { detectIocType } from '../server/ioc/validate';
+  <p id="result-error" class="status-message" data-tone="error" role="alert"></p>
 
-      const form = document.getElementById('ioc-form') as HTMLFormElement;
-      const valueInput = document.getElementById('ioc-value') as HTMLInputElement;
-      const typeBadge = document.getElementById('ioc-type-badge')!;
-      const resultEl = document.getElementById('result')!;
+  <div id="result-card" class="card" style="display:none;">
+    <div class="result-head">
+      <code id="result-value"></code>
+      <span id="result-verdict" class="badge"></span>
+    </div>
+    <div id="result-providers" class="provider-list"></div>
+  </div>
 
-      const TYPE_LABEL: Record<string, string> = {
-        ip: 'IP Address',
-        domain: 'Domain',
-        hash: 'File Hash',
-        url: 'URL',
-      };
+  <style>
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .input-row input {
+      flex: 1;
+      min-width: 200px;
+    }
+    .result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .result-head code {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      word-break: break-all;
+    }
+    .provider-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .provider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.8rem;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      flex-wrap: wrap;
+    }
+    .provider-row strong {
+      min-width: 90px;
+    }
+    .provider-row span.detail {
+      color: var(--text-muted);
+    }
+  </style>
 
-      valueInput.addEventListener('input', () => {
-        const type = detectIocType(valueInput.value);
-        typeBadge.textContent = type ? `Terdeteksi: ${TYPE_LABEL[type]}` : '';
-      });
+  <script>
+    import { detectIocType } from '../server/ioc/validate';
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const value = valueInput.value;
-        const type = detectIocType(value);
+    interface ProviderResult {
+      name: string;
+      verdict: string;
+      detail: string;
+    }
+    interface IocCheckResult {
+      value: string;
+      type: string;
+      verdict: string;
+      providers: ProviderResult[];
+      error?: string;
+    }
 
-        if (!type) {
-          resultEl.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash (MD5/SHA1/SHA256), atau URL yang valid.';
-          return;
-        }
+    const form = document.getElementById('ioc-form') as HTMLFormElement;
+    const submitBtn = document.getElementById('ioc-submit') as HTMLButtonElement;
+    const valueInput = document.getElementById('ioc-value') as HTMLInputElement;
+    const typeBadge = document.getElementById('ioc-type-badge') as HTMLSpanElement;
+    const errorEl = document.getElementById('result-error')!;
+    const resultCard = document.getElementById('result-card') as HTMLDivElement;
+    const resultValueEl = document.getElementById('result-value')!;
+    const resultVerdictEl = document.getElementById('result-verdict') as HTMLSpanElement;
+    const resultProvidersEl = document.getElementById('result-providers')!;
 
-        resultEl.textContent = 'Memeriksa...';
+    const TYPE_LABEL: Record<string, string> = {
+      ip: 'IP Address',
+      domain: 'Domain',
+      hash: 'File Hash',
+      url: 'URL',
+    };
+
+    valueInput.addEventListener('input', () => {
+      const type = detectIocType(valueInput.value);
+      if (type) {
+        typeBadge.textContent = TYPE_LABEL[type];
+        typeBadge.className = 'badge badge-unknown';
+        typeBadge.style.display = 'inline-flex';
+      } else {
+        typeBadge.style.display = 'none';
+      }
+    });
+
+    function renderResult(data: IocCheckResult) {
+      resultValueEl.textContent = data.value;
+      resultVerdictEl.textContent = data.verdict;
+      resultVerdictEl.className = `badge badge-${data.verdict}`;
+
+      resultProvidersEl.innerHTML = '';
+      for (const p of data.providers) {
+        const row = document.createElement('div');
+        row.className = 'provider-row';
+
+        const badge = document.createElement('span');
+        badge.className = `badge badge-${p.verdict}`;
+        badge.textContent = p.verdict;
+
+        const name = document.createElement('strong');
+        name.textContent = p.name;
+
+        const detail = document.createElement('span');
+        detail.className = 'detail';
+        detail.textContent = p.detail;
+
+        row.appendChild(badge);
+        row.appendChild(name);
+        row.appendChild(detail);
+        resultProvidersEl.appendChild(row);
+      }
+
+      resultCard.style.display = 'block';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+      resultCard.style.display = 'none';
+
+      const value = valueInput.value;
+      const type = detectIocType(value);
+
+      if (!type) {
+        errorEl.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash (MD5/SHA1/SHA256), atau URL yang valid.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Memeriksa...';
+
+      try {
         const res = await fetch('/api/ioc/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type, value }),
         });
-        const data = await res.json();
-        resultEl.textContent = JSON.stringify(data, null, 2);
-      });
-    </script>
-  </body>
-</html>
+        const data = (await res.json()) as IocCheckResult;
+
+        if (!res.ok) {
+          errorEl.textContent = data.error ?? 'Gagal memeriksa IOC';
+          return;
+        }
+
+        renderResult(data);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Cek Sekarang';
+      }
+    });
+  </script>
+</Layout>

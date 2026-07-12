@@ -1,5 +1,5 @@
 ---
-import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
 import { getSessionUser } from '../server/auth/session';
 import { MAX_BULK_ITEMS } from '../server/ioc/types';
 
@@ -11,180 +11,191 @@ if (!user) {
   return Astro.redirect('/login');
 }
 ---
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bulk IOC Checker — Rekan Siber</title>
-  </head>
-  <body>
-    <Navbar user={user} />
-    <main>
-      <h1>Bulk IOC Checker</h1>
-      <p>
-        Tempel atau upload daftar IOC (IP, domain, hash, URL) satu per baris -- type dideteksi
-        otomatis. Maksimal {MAX_BULK_ITEMS} IOC per batch.
-      </p>
 
-      <textarea
-        id="bulk-input"
-        rows="10"
-        style="width:100%; max-width:600px; font-family:monospace;"
-        placeholder={'8.8.8.8\nexample.com\nhttps://evil.example/phish'}></textarea>
-      <br />
+<Layout title="Bulk IOC Checker" user={user}>
+  <div class="page-header">
+    <h1>Bulk IOC Checker</h1>
+    <p>
+      Tempel atau upload daftar IOC (IP, domain, hash, URL) satu per baris -- type dideteksi
+      otomatis. Maksimal {MAX_BULK_ITEMS} IOC per batch.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="bulk-input">Daftar IOC</label>
+      <textarea id="bulk-input" rows="8" placeholder={'8.8.8.8\nexample.com\nhttps://evil.example/phish'}></textarea>
+    </div>
+    <div class="field">
+      <label for="bulk-file">Atau upload file .txt/.csv</label>
       <input id="bulk-file" type="file" accept=".txt,.csv" />
-      <br /><br />
-      <button id="bulk-submit" type="button">Cek Semua</button>
-      <button id="bulk-export" type="button" disabled>Export CSV</button>
+    </div>
+    <div class="btn-row">
+      <button id="bulk-submit" type="button" class="btn">Cek Semua</button>
+      <button id="bulk-export" type="button" class="btn btn-secondary" disabled>Export CSV</button>
+    </div>
+    <p id="bulk-status" class="status-message" role="status"></p>
+  </div>
 
-      <p id="bulk-status" role="status"></p>
+  <div class="card" id="bulk-results-card" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th>Value</th>
+          <th>Type</th>
+          <th>Verdict</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody id="bulk-results-body"></tbody>
+    </table>
+  </div>
 
-      <table id="bulk-results" style="display:none; border-collapse:collapse; width:100%;">
-        <thead>
-          <tr>
-            <th style="text-align:left; border-bottom:1px solid #2a2f3a; padding:0.5rem;">Value</th>
-            <th style="text-align:left; border-bottom:1px solid #2a2f3a; padding:0.5rem;">Type</th>
-            <th style="text-align:left; border-bottom:1px solid #2a2f3a; padding:0.5rem;">Verdict</th>
-            <th style="text-align:left; border-bottom:1px solid #2a2f3a; padding:0.5rem;">Detail</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </main>
+  <script>
+    import { detectIocType } from '../server/ioc/validate';
+    import { MAX_BULK_ITEMS } from '../server/ioc/types';
+    import type { IocType, Verdict } from '../server/ioc/types';
 
-    <script>
-      import { detectIocType } from '../server/ioc/validate';
-      import { MAX_BULK_ITEMS } from '../server/ioc/types';
-      import type { IocType, Verdict } from '../server/ioc/types';
+    interface BulkResultItem {
+      value: string;
+      type: IocType | null;
+      verdict: Verdict;
+      error?: string;
+      providers: { name: string; verdict: Verdict; detail: string }[];
+    }
 
-      interface BulkResultItem {
-        value: string;
-        type: IocType | null;
-        verdict: Verdict;
-        error?: string;
-        providers: { name: string; verdict: Verdict; detail: string }[];
+    const textarea = document.getElementById('bulk-input') as HTMLTextAreaElement;
+    const fileInput = document.getElementById('bulk-file') as HTMLInputElement;
+    const submitBtn = document.getElementById('bulk-submit') as HTMLButtonElement;
+    const exportBtn = document.getElementById('bulk-export') as HTMLButtonElement;
+    const statusEl = document.getElementById('bulk-status')!;
+    const resultsCard = document.getElementById('bulk-results-card') as HTMLDivElement;
+    const tbody = document.getElementById('bulk-results-body')!;
+
+    let lastResults: BulkResultItem[] = [];
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      textarea.value = await file.text();
+    });
+
+    submitBtn.addEventListener('click', async () => {
+      const lines = textarea.value
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      if (lines.length === 0) {
+        statusEl.textContent = 'Masukkan minimal 1 IOC';
+        return;
+      }
+      if (lines.length > MAX_BULK_ITEMS) {
+        statusEl.textContent = `Maksimal ${MAX_BULK_ITEMS} IOC sekaligus (kamu memasukkan ${lines.length})`;
+        return;
       }
 
-      const textarea = document.getElementById('bulk-input') as HTMLTextAreaElement;
-      const fileInput = document.getElementById('bulk-file') as HTMLInputElement;
-      const submitBtn = document.getElementById('bulk-submit') as HTMLButtonElement;
-      const exportBtn = document.getElementById('bulk-export') as HTMLButtonElement;
-      const statusEl = document.getElementById('bulk-status')!;
-      const table = document.getElementById('bulk-results') as HTMLTableElement;
-      const tbody = table.querySelector('tbody')!;
-
-      let lastResults: BulkResultItem[] = [];
-
-      fileInput.addEventListener('change', async () => {
-        const file = fileInput.files?.[0];
-        if (!file) return;
-        textarea.value = await file.text();
-      });
-
-      submitBtn.addEventListener('click', async () => {
-        const lines = textarea.value
-          .split('\n')
-          .map((l) => l.trim())
-          .filter(Boolean);
-
-        if (lines.length === 0) {
-          statusEl.textContent = 'Masukkan minimal 1 IOC';
-          return;
+      const items: { value: string; type: IocType }[] = [];
+      let skipped = 0;
+      for (const line of lines) {
+        const type = detectIocType(line);
+        if (!type) {
+          skipped++;
+          continue;
         }
-        if (lines.length > MAX_BULK_ITEMS) {
-          statusEl.textContent = `Maksimal ${MAX_BULK_ITEMS} IOC sekaligus (kamu memasukkan ${lines.length})`;
-          return;
-        }
-
-        const items: { value: string; type: IocType }[] = [];
-        let skipped = 0;
-        for (const line of lines) {
-          const type = detectIocType(line);
-          if (!type) {
-            skipped++;
-            continue;
-          }
-          items.push({ value: line, type });
-        }
-
-        if (items.length === 0) {
-          statusEl.textContent = 'Tidak ada IOC dengan format valid yang terdeteksi';
-          return;
-        }
-
-        statusEl.textContent = `Memeriksa ${items.length} IOC...`;
-        submitBtn.disabled = true;
-        exportBtn.disabled = true;
-
-        try {
-          const res = await fetch('/api/ioc/bulk-check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items }),
-          });
-
-          if (!res.ok) {
-            const data = (await res.json().catch(() => ({}))) as { error?: string };
-            statusEl.textContent = data.error ?? 'Gagal memeriksa IOC';
-            return;
-          }
-
-          const data = (await res.json()) as { results: BulkResultItem[] };
-          lastResults = data.results;
-          renderResults(lastResults);
-          statusEl.textContent =
-            `Selesai: ${lastResults.length} IOC diperiksa` +
-            (skipped ? `, ${skipped} baris dilewati (format tidak dikenali)` : '');
-          exportBtn.disabled = lastResults.length === 0;
-        } finally {
-          submitBtn.disabled = false;
-        }
-      });
-
-      function renderResults(results: BulkResultItem[]) {
-        tbody.innerHTML = '';
-        for (const r of results) {
-          const detail = r.error ?? r.providers.map((p) => `${p.name}: ${p.detail}`).join(' | ');
-          const tr = document.createElement('tr');
-          for (const text of [r.value, r.type ?? '-', r.verdict, detail]) {
-            const td = document.createElement('td');
-            td.style.padding = '0.5rem';
-            td.style.borderBottom = '1px solid #2a2f3a';
-            td.textContent = text;
-            tr.appendChild(td);
-          }
-          tbody.appendChild(tr);
-        }
-        table.style.display = results.length ? 'table' : 'none';
+        items.push({ value: line, type });
       }
 
-      function csvEscape(value: string): string {
-        if (/[",\n\r]/.test(value)) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
+      if (items.length === 0) {
+        statusEl.textContent = 'Tidak ada IOC dengan format valid yang terdeteksi';
+        return;
       }
 
-      exportBtn.addEventListener('click', () => {
-        if (lastResults.length === 0) return;
+      statusEl.textContent = `Memeriksa ${items.length} IOC...`;
+      submitBtn.disabled = true;
+      exportBtn.disabled = true;
 
-        const header = ['value', 'type', 'verdict', 'detail'];
-        const rows = lastResults.map((r) => [
-          r.value,
-          r.type ?? '',
-          r.verdict,
-          r.error ?? r.providers.map((p) => `${p.name}: ${p.detail}`).join(' | '),
-        ]);
-        const csv = [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
+      try {
+        const res = await fetch('/api/ioc/bulk-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        });
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ioc-bulk-check-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      });
-    </script>
-  </body>
-</html>
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          statusEl.textContent = data.error ?? 'Gagal memeriksa IOC';
+          return;
+        }
+
+        const data = (await res.json()) as { results: BulkResultItem[] };
+        lastResults = data.results;
+        renderResults(lastResults);
+        statusEl.textContent =
+          `Selesai: ${lastResults.length} IOC diperiksa` +
+          (skipped ? `, ${skipped} baris dilewati (format tidak dikenali)` : '');
+        exportBtn.disabled = lastResults.length === 0;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    function renderResults(results: BulkResultItem[]) {
+      tbody.innerHTML = '';
+      for (const r of results) {
+        const detail = r.error ?? r.providers.map((p) => `${p.name}: ${p.detail}`).join(' | ');
+        const tr = document.createElement('tr');
+
+        const valueTd = document.createElement('td');
+        valueTd.textContent = r.value;
+
+        const typeTd = document.createElement('td');
+        typeTd.textContent = r.type ?? '-';
+
+        const verdictTd = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = `badge badge-${r.verdict}`;
+        badge.textContent = r.verdict;
+        verdictTd.appendChild(badge);
+
+        const detailTd = document.createElement('td');
+        detailTd.textContent = detail;
+
+        tr.appendChild(valueTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(verdictTd);
+        tr.appendChild(detailTd);
+        tbody.appendChild(tr);
+      }
+      resultsCard.style.display = results.length ? 'block' : 'none';
+    }
+
+    function csvEscape(value: string): string {
+      if (/[",\n\r]/.test(value)) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    }
+
+    exportBtn.addEventListener('click', () => {
+      if (lastResults.length === 0) return;
+
+      const header = ['value', 'type', 'verdict', 'detail'];
+      const rows = lastResults.map((r) => [
+        r.value,
+        r.type ?? '',
+        r.verdict,
+        r.error ?? r.providers.map((p) => `${p.name}: ${p.detail}`).join(' | '),
+      ]);
+      const csv = [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ioc-bulk-check-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</Layout>
