@@ -16,16 +16,14 @@ const user = token ? await getSessionUser(db, token) : null;
     <Navbar user={user} />
     <main>
       <h1>IOC Checker</h1>
-      <p>Masukkan IP, domain, hash, atau URL untuk dicek ke VirusTotal, AbuseIPDB, dan OTX.</p>
+      <p>
+        Masukkan IP, domain, hash, atau URL -- type-nya otomatis terdeteksi, lalu dicek ke
+        VirusTotal, AbuseIPDB, dan OTX.
+      </p>
 
       <form id="ioc-form">
-        <select id="ioc-type" name="type">
-          <option value="ip">IP Address</option>
-          <option value="domain">Domain</option>
-          <option value="hash">File Hash</option>
-          <option value="url">URL</option>
-        </select>
-        <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required />
+        <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8" required autocomplete="off" />
+        <span id="ioc-type-badge"></span>
         <button type="submit">Cek Sekarang</button>
       </form>
 
@@ -33,15 +31,34 @@ const user = token ? await getSessionUser(db, token) : null;
     </main>
 
     <script>
-      // Ini contoh minimal manggil endpoint Hono kita (/api/ioc/check).
-      // Nanti akan diganti dengan tampilan hasil yang lebih rapi (kartu, badge verdict, dll).
+      import { detectIocType } from '../server/ioc/validate';
+
       const form = document.getElementById('ioc-form') as HTMLFormElement;
+      const valueInput = document.getElementById('ioc-value') as HTMLInputElement;
+      const typeBadge = document.getElementById('ioc-type-badge')!;
       const resultEl = document.getElementById('result')!;
+
+      const TYPE_LABEL: Record<string, string> = {
+        ip: 'IP Address',
+        domain: 'Domain',
+        hash: 'File Hash',
+        url: 'URL',
+      };
+
+      valueInput.addEventListener('input', () => {
+        const type = detectIocType(valueInput.value);
+        typeBadge.textContent = type ? `Terdeteksi: ${TYPE_LABEL[type]}` : '';
+      });
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const type = (document.getElementById('ioc-type') as unknown as HTMLSelectElement).value;
-        const value = (document.getElementById('ioc-value') as HTMLInputElement).value;
+        const value = valueInput.value;
+        const type = detectIocType(value);
+
+        if (!type) {
+          resultEl.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash (MD5/SHA1/SHA256), atau URL yang valid.';
+          return;
+        }
 
         resultEl.textContent = 'Memeriksa...';
         const res = await fetch('/api/ioc/check', {
