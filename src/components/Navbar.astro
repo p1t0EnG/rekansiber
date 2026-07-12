@@ -24,7 +24,16 @@ const isActive = (href: string) => (href === '/' ? currentPath === '/' : current
 <nav class="navbar">
   <div class="navbar-inner">
     <a href="/" class="brand">
-      <span class="brand-mark">RS</span>
+      <span class="brand-mark">
+        <svg viewBox="0 0 100 100" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M50 19 L74 28 L74 47 C74 63 63 75 50 81 C37 75 26 63 26 47 L26 28 Z" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+          <path d="M40 40 L59 43 L57 62 L46 62 Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round" opacity="0.6"/>
+          <circle cx="40" cy="40" r="5.5" fill="currentColor"/>
+          <circle cx="59" cy="43" r="5.5" fill="currentColor"/>
+          <circle cx="57" cy="62" r="5.5" fill="currentColor"/>
+          <circle cx="46" cy="62" r="5.5" fill="currentColor"/>
+        </svg>
+      </span>
       Rekan Siber
     </a>
     <div class="links">
@@ -91,9 +100,6 @@ const isActive = (href: string) => (href === '/' ? currentPath === '/' : current
     border-radius: 7px;
     background: linear-gradient(135deg, var(--brand), #0ea5e9);
     color: #04121a;
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.02em;
   }
   .links {
     display: flex;
