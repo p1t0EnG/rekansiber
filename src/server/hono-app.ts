@@ -7,6 +7,7 @@ import { MAX_BULK_ITEMS, type IocType } from './ioc/types';
 import { verifyPassword } from './auth/password';
 import { createSession, getSessionUser, deleteSession, type SessionUser } from './auth/session';
 import { requireAuth, SESSION_COOKIE_NAME } from './auth/middleware';
+import { getDashboardStats } from './dashboard/stats';
 
 // Bindings ini datang dari wrangler.toml (D1, KV) + .dev.vars / dashboard (API keys)
 type Bindings = {
@@ -156,10 +157,9 @@ app.get('/auth/me', async (c) => {
 });
 
 // --- Dashboard: statistik pengecekan per anggota tim (butuh login) ---
-// TODO tahap coding berikutnya: query agregasi dari tabel ioc_checks
-// GROUP BY user_id, DATE(checked_at)
 app.get('/dashboard/stats', requireAuth, async (c) => {
-  return c.json({ message: 'Belum diimplementasi' }, 501);
+  const stats = await getDashboardStats(c.env.DB);
+  return c.json(stats);
 });
 
 export default app;
