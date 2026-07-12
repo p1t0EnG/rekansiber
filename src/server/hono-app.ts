@@ -9,6 +9,14 @@ import { createSession, getSessionUser, deleteSession, type SessionUser } from '
 import { requireAuth, SESSION_COOKIE_NAME } from './auth/middleware';
 import { getDashboardStats } from './dashboard/stats';
 import { getMonthlyStats, buildMonthlyReportPdf, buildMonthlyReportXlsx } from './reports/monthly';
+import {
+  listPhishingReports,
+  getPhishingReport,
+  createPhishingReport,
+  updatePhishingReportStatus,
+  type PhishingReportStatus,
+} from './phishing/reports';
+import { generatePhishingReportTemplate } from './phishing/template';
 
 // Bindings ini datang dari wrangler.toml (D1, KV) + .dev.vars / dashboard (API keys)
 type Bindings = {
@@ -198,6 +206,68 @@ app.get('/reports/monthly.xlsx', requireAuth, async (c) => {
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'Content-Disposition': `attachment; filename="report-bulanan-${month}.xlsx"`,
   });
+});
+
+// --- Template report phishing ke hosting provider (tim SOC, butuh login) ---
+// App cuma generate teks template-nya -- pengiriman email tetap manual lewat
+// email client masing-masing analyst, lalu status di-update di sini.
+const PHISHING_STATUSES: PhishingReportStatus[] = ['draft', 'sent', 'resolved'];
+
+app.get('/phishing-reports', requireAuth, async (c) => {
+  const reports = await listPhishingReports(c.env.DB);
+  return c.json({ reports });
+});
+
+app.post('/phishing-reports', requireAuth, async (c) => {
+  const body = await c.req
+    .json<{ target_domain: string; hosting_email?: string; notes?: string }>()
+    .catch(() => null);
+
+  if (!body?.target_domain?.trim()) {
+    return c.json({ error: 'target_domain wajib diisi' }, 400);
+  }
+
+  const user = c.get('user');
+  const id = await createPhishingReport(
+    c.env.DB,
+    user.id,
+    body.target_domain.trim(),
+    body.hosting_email?.trim() || null,
+    body.notes?.trim() || null,
+  );
+
+  return c.json({ id }, 201);
+});
+
+app.patch('/phishing-reports/:id', requireAuth, async (c) => {
+  const id = Number(c.req.param('id'));
+  const body = await c.req.json<{ status: PhishingReportStatus }>().catch(() => null);
+
+  if (!Number.isInteger(id) || !body?.status || !PHISHING_STATUSES.includes(body.status)) {
+    return c.json({ error: `status harus salah satu dari: ${PHISHING_STATUSES.join(', ')}` }, 400);
+  }
+
+  const existing = await getPhishingReport(c.env.DB, id);
+  if (!existing) {
+    return c.json({ error: 'Report tidak ditemukan' }, 404);
+  }
+
+  await updatePhishingReportStatus(c.env.DB, id, body.status);
+  return c.json({ message: 'Status diperbarui' });
+});
+
+app.get('/phishing-reports/:id/template', requireAuth, async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.json({ error: 'id tidak valid' }, 400);
+  }
+
+  const report = await getPhishingReport(c.env.DB, id);
+  if (!report) {
+    return c.json({ error: 'Report tidak ditemukan' }, 404);
+  }
+
+  return c.text(generatePhishingReportTemplate(report));
 });
 
 export default app;
