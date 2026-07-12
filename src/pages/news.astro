@@ -1,5 +1,11 @@
 ---
 import Navbar from '../components/Navbar.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
 // Server-side fetch ke endpoint kita sendiri saat halaman di-render
 const res = await Astro.locals.runtime.env.NEWS_CACHE.get('cve-latest', 'json');
 const news = (res as { items: Array<{ title: string; link: string; source: string }> } | null)?.items ?? [];
@@ -11,7 +17,7 @@ const news = (res as { items: Array<{ title: string; link: string; source: strin
     <title>Berita CVE & Ransomware — Rekan Siber</title>
   </head>
   <body>
-    <Navbar />
+    <Navbar user={user} />
     <main>
       <h1>Berita CVE & Ransomware Terbaru</h1>
       {news.length === 0 && <p>Belum ada data cache. Cron job pengambil berita jalan tiap 6 jam.</p>}

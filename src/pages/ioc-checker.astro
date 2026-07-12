@@ -1,5 +1,10 @@
 ---
 import Navbar from '../components/Navbar.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
 ---
 <html lang="id">
   <head>
@@ -8,7 +13,7 @@ import Navbar from '../components/Navbar.astro';
     <title>IOC Checker — Rekan Siber</title>
   </head>
   <body>
-    <Navbar />
+    <Navbar user={user} />
     <main>
       <h1>IOC Checker</h1>
       <p>Masukkan IP, domain, hash, atau URL untuk dicek ke VirusTotal, AbuseIPDB, dan OTX.</p>

@@ -1,5 +1,14 @@
 ---
 import Navbar from '../components/Navbar.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (user) {
+  return Astro.redirect('/dashboard');
+}
 ---
 <html lang="id">
   <head>
