@@ -1,0 +1,10 @@
+{
+  "name": "rekansiber-news-cron",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  }
+}

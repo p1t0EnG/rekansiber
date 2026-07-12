@@ -1,0 +1,14 @@
+name = "rekansiber-news-cron"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# Jalan tiap 6 jam. Format cron standar (menit jam tgl bulan hari).
+[triggers]
+crons = ["0 */6 * * *"]
+
+# Binding KV yang SAMA dengan project utama (rekansiber), supaya endpoint
+# /api/news/cve di Astro bisa baca hasil fetch-an worker ini.
+# ID di bawah harus sama dengan [[kv_namespaces]] NEWS_CACHE di ../wrangler.toml
+[[kv_namespaces]]
+binding = "NEWS_CACHE"
+id = "52cde55653a14feda15e840968fc30cc"

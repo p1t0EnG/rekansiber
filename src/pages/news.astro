@@ -14,7 +14,7 @@ const news = (res as { items: Array<{ title: string; link: string; source: strin
     <Navbar />
     <main>
       <h1>Berita CVE & Ransomware Terbaru</h1>
-      {news.length === 0 && <p>Belum ada data. Cron job pengambil berita akan kita bangun di tahap berikutnya.</p>}
+      {news.length === 0 && <p>Belum ada data cache. Cron job pengambil berita jalan tiap 6 jam.</p>}
       <ul>
         {news.map((item) => (
           <li>
