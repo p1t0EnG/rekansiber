@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { isValidIoc } from './ioc/validate';
 import { checkIoc } from './ioc/check';
@@ -8,6 +8,7 @@ import { verifyPassword } from './auth/password';
 import { createSession, getSessionUser, deleteSession, type SessionUser } from './auth/session';
 import { requireAuth, SESSION_COOKIE_NAME } from './auth/middleware';
 import { getDashboardStats } from './dashboard/stats';
+import { getMonthlyStats, buildMonthlyReportPdf, buildMonthlyReportXlsx } from './reports/monthly';
 
 // Bindings ini datang dari wrangler.toml (D1, KV) + .dev.vars / dashboard (API keys)
 type Bindings = {
@@ -20,8 +21,9 @@ type Bindings = {
 };
 
 type Variables = { user: SessionUser };
+type AppEnv = { Bindings: Bindings; Variables: Variables };
 
-const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath('/api');
+const app = new Hono<AppEnv>().basePath('/api');
 
 const VALID_TYPES: IocType[] = ['ip', 'domain', 'hash', 'url'];
 
@@ -103,9 +105,7 @@ app.post('/ioc/bulk-check', requireAuth, async (c) => {
   return c.json({ results });
 });
 
-// --- Berita CVE & Ransomware (dibaca dari cache KV, diisi oleh Cron Trigger) ---
-// TODO tahap coding berikutnya: bikin Worker terpisah dengan `scheduled()` handler
-// yang fetch RSS TheHackerNews / RansomHub tiap beberapa jam lalu simpan ke KV.
+// --- Berita CVE & Ransomware (dibaca dari cache KV, diisi oleh worker terpisah news-cron/) ---
 app.get('/news/cve', async (c) => {
   const cached = await c.env.NEWS_CACHE.get('cve-latest', 'json');
   return c.json(cached ?? { items: [], message: 'Belum ada data cache' });
@@ -160,6 +160,44 @@ app.get('/auth/me', async (c) => {
 app.get('/dashboard/stats', requireAuth, async (c) => {
   const stats = await getDashboardStats(c.env.DB);
   return c.json(stats);
+});
+
+// --- Report bulanan (PDF/Excel rekap per anggota, butuh login) ---
+const YEAR_MONTH_RE = /^\d{4}-\d{2}$/;
+
+function resolveReportMonth(c: Context<AppEnv>): string | null {
+  const month = c.req.query('month') ?? new Date().toISOString().slice(0, 7);
+  return YEAR_MONTH_RE.test(month) ? month : null;
+}
+
+app.get('/reports/monthly.pdf', requireAuth, async (c) => {
+  const month = resolveReportMonth(c);
+  if (!month) {
+    return c.json({ error: 'Parameter month harus format YYYY-MM' }, 400);
+  }
+
+  const rows = await getMonthlyStats(c.env.DB, month);
+  const pdfBytes = await buildMonthlyReportPdf(month, rows);
+
+  return c.body(pdfBytes as Uint8Array<ArrayBuffer>, 200, {
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="report-bulanan-${month}.pdf"`,
+  });
+});
+
+app.get('/reports/monthly.xlsx', requireAuth, async (c) => {
+  const month = resolveReportMonth(c);
+  if (!month) {
+    return c.json({ error: 'Parameter month harus format YYYY-MM' }, 400);
+  }
+
+  const rows = await getMonthlyStats(c.env.DB, month);
+  const xlsxBytes = buildMonthlyReportXlsx(month, rows);
+
+  return c.body(xlsxBytes as Uint8Array<ArrayBuffer>, 200, {
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': `attachment; filename="report-bulanan-${month}.xlsx"`,
+  });
 });
 
 export default app;

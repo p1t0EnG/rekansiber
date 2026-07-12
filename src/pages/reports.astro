@@ -1,0 +1,36 @@
+---
+import Navbar from '../components/Navbar.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const currentMonth = new Date().toISOString().slice(0, 7);
+---
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Report Bulanan — Rekan Siber</title>
+  </head>
+  <body>
+    <Navbar user={user} />
+    <main>
+      <h1>Report Bulanan</h1>
+      <p>Pilih bulan, lalu download rekap pengecekan IOC per anggota tim dalam format PDF atau Excel.</p>
+
+      <form method="get" action="/api/reports/monthly.pdf">
+        <label for="report-month">Bulan:</label>
+        <input type="month" id="report-month" name="month" value={currentMonth} required />
+        <br /><br />
+        <button type="submit" formaction="/api/reports/monthly.pdf">Download PDF</button>
+        <button type="submit" formaction="/api/reports/monthly.xlsx">Download Excel</button>
+      </form>
+    </main>
+  </body>
+</html>
