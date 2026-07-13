@@ -1,13 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
+const PageLayout = user ? AppLayout : Layout;
 ---
 
-<Layout title="IOC Checker" user={user}>
+<PageLayout title="IOC Checker" user={user}>
   <div class="page-header">
     <h1>IOC Checker</h1>
     <p>Masukkan IP, domain, hash, atau URL.</p>
@@ -28,13 +30,14 @@ const user = token ? await getSessionUser(db, token) : null;
 
   <p id="result-error" class="status-message" data-tone="error" role="alert"></p>
 
-  <div id="result-card" class="card" style="display:none;">
+  <div id="result-summary" class="card" style="display:none;">
     <div class="result-head">
       <code id="result-value"></code>
       <span id="result-verdict" class="badge"></span>
     </div>
-    <div id="result-providers" class="provider-list"></div>
   </div>
+
+  <div id="result-providers" class="provider-grid"></div>
 
   <style>
     .input-row {
@@ -52,7 +55,6 @@ const user = token ? await getSessionUser(db, token) : null;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
-      margin-bottom: 1rem;
       flex-wrap: wrap;
     }
     .result-head code {
@@ -60,26 +62,40 @@ const user = token ? await getSessionUser(db, token) : null;
       font-size: 0.95rem;
       word-break: break-all;
     }
-    .provider-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
     }
-    .provider-row {
+    .provider-card {
+      margin-bottom: 0;
+    }
+    .provider-card-head {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 0.75rem;
-      padding: 0.6rem 0.8rem;
-      background: var(--surface-2);
-      border-radius: var(--radius-sm);
-      font-size: 0.88rem;
-      flex-wrap: wrap;
+      margin-bottom: 0.6rem;
     }
-    .provider-row strong {
-      min-width: 90px;
+    .provider-card-head strong {
+      font-size: 0.95rem;
     }
-    .provider-row span.detail {
+    .provider-detail {
       color: var(--text-muted);
+      font-size: 0.86rem;
+      margin: 0 0 1.1rem;
+    }
+    .provider-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--brand);
+      text-decoration: none;
+    }
+    .provider-link:hover {
+      text-decoration: underline;
     }
   </style>
 
@@ -104,10 +120,31 @@ const user = token ? await getSessionUser(db, token) : null;
     const valueInput = document.getElementById('ioc-value') as HTMLInputElement;
     const typeBadge = document.getElementById('ioc-type-badge') as HTMLSpanElement;
     const errorEl = document.getElementById('result-error')!;
-    const resultCard = document.getElementById('result-card') as HTMLDivElement;
+    const resultSummary = document.getElementById('result-summary') as HTMLDivElement;
     const resultValueEl = document.getElementById('result-value')!;
     const resultVerdictEl = document.getElementById('result-verdict') as HTMLSpanElement;
     const resultProvidersEl = document.getElementById('result-providers')!;
+
+    // Link ke halaman pengecekan resmi tiap provider, biar analyst bisa lihat detail lengkap.
+    function buildProviderLink(providerName: string, type: string, value: string): string | null {
+      const encoded = encodeURIComponent(value);
+      if (providerName === 'VirusTotal') {
+        if (type === 'ip') return `https://www.virustotal.com/gui/ip-address/${encoded}`;
+        if (type === 'domain') return `https://www.virustotal.com/gui/domain/${encoded}`;
+        if (type === 'hash') return `https://www.virustotal.com/gui/file/${encoded}`;
+        if (type === 'url') return `https://www.virustotal.com/gui/search/${encoded}`;
+      }
+      if (providerName === 'AbuseIPDB') {
+        if (type === 'ip') return `https://www.abuseipdb.com/check/${encoded}`;
+      }
+      if (providerName === 'OTX') {
+        if (type === 'ip') return `https://otx.alienvault.com/indicator/ip/${encoded}`;
+        if (type === 'domain') return `https://otx.alienvault.com/indicator/domain/${encoded}`;
+        if (type === 'hash') return `https://otx.alienvault.com/indicator/file/${encoded}`;
+        if (type === 'url') return `https://otx.alienvault.com/indicator/url/${encoded}`;
+      }
+      return null;
+    }
 
     const TYPE_LABEL: Record<string, string> = {
       ip: 'IP Address',
@@ -134,33 +171,51 @@ const user = token ? await getSessionUser(db, token) : null;
 
       resultProvidersEl.innerHTML = '';
       for (const p of data.providers) {
-        const row = document.createElement('div');
-        row.className = 'provider-row';
+        const card = document.createElement('div');
+        card.className = 'card provider-card';
+
+        const head = document.createElement('div');
+        head.className = 'provider-card-head';
+
+        const name = document.createElement('strong');
+        name.textContent = p.name;
 
         const badge = document.createElement('span');
         badge.className = `badge badge-${p.verdict}`;
         badge.textContent = p.verdict;
 
-        const name = document.createElement('strong');
-        name.textContent = p.name;
+        head.appendChild(name);
+        head.appendChild(badge);
 
-        const detail = document.createElement('span');
-        detail.className = 'detail';
+        const detail = document.createElement('p');
+        detail.className = 'provider-detail';
         detail.textContent = p.detail;
 
-        row.appendChild(badge);
-        row.appendChild(name);
-        row.appendChild(detail);
-        resultProvidersEl.appendChild(row);
+        card.appendChild(head);
+        card.appendChild(detail);
+
+        const link = buildProviderLink(p.name, data.type, data.value);
+        if (link) {
+          const a = document.createElement('a');
+          a.href = link;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.className = 'provider-link';
+          a.textContent = `Lihat di ${p.name} →`;
+          card.appendChild(a);
+        }
+
+        resultProvidersEl.appendChild(card);
       }
 
-      resultCard.style.display = 'block';
+      resultSummary.style.display = 'block';
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorEl.textContent = '';
-      resultCard.style.display = 'none';
+      resultSummary.style.display = 'none';
+      resultProvidersEl.innerHTML = '';
 
       const value = valueInput.value;
       const type = detectIocType(value);
@@ -193,4 +248,4 @@ const user = token ? await getSessionUser(db, token) : null;
       }
     });
   </script>
-</Layout>
+</PageLayout>

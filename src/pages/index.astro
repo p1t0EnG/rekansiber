@@ -1,13 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
+const PageLayout = user ? AppLayout : Layout;
 ---
 
-<Layout title="Home" user={user}>
+<PageLayout title="Home" user={user}>
   <section class="hero card">
     <span class="eyebrow">Rekan Siber</span>
     <h1>Proactive Cyber Defense untuk Tim Kamu</h1>
@@ -31,7 +33,7 @@ const user = token ? await getSessionUser(db, token) : null;
       <p>Update otomatis tiap 6 jam dari The Hacker News dan BleepingComputer.</p>
     </a>
   </div>
-</Layout>
+</PageLayout>
 
 <style>
   .hero {
