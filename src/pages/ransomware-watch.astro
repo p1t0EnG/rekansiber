@@ -1,0 +1,182 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+interface RansomVictim {
+  victim: string;
+  group: string;
+  activity: string;
+  country: string;
+  attackdate: string;
+  url: string;
+}
+
+const cache = (await Astro.locals.runtime.env.NEWS_CACHE.get('ransomware-latest', 'json')) as {
+  victims: RansomVictim[];
+  updatedAt?: string;
+} | null;
+const victims = cache?.victims ?? [];
+
+const uniqueGroups = new Set(victims.map((v) => v.group)).size;
+const indonesiaCount = victims.filter((v) => v.country === 'ID').length;
+
+function formatDate(value?: string): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  });
+}
+
+// Kode negara ISO -> emoji bendera (regional indicator symbols)
+function countryFlag(iso: string): string {
+  if (!/^[A-Z]{2}$/.test(iso)) return '';
+  return String.fromCodePoint(...[...iso].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+---
+
+<AppLayout title="Ransomware Watch" user={user}>
+  <div class="page-header">
+    <h1>Ransomware Watch</h1>
+    <p>
+      Korban ransomware terbaru dari ransomware.live, diperbarui otomatis tiap 6 jam.
+      {cache?.updatedAt && ` Terakhir diperbarui: ${formatDate(cache.updatedAt)}.`}
+    </p>
+  </div>
+
+  {victims.length === 0 && (
+    <p class="empty-state">Belum ada data cache. Worker cron mengambil data tiap 6 jam.</p>
+  )}
+
+  {victims.length > 0 && (
+    <>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">{victims.length}</div>
+          <div class="stat-label">Korban Terbaru</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{uniqueGroups}</div>
+          <div class="stat-label">Grup Aktif</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style={indonesiaCount > 0 ? 'color: var(--danger);' : ''}>
+            {indonesiaCount}
+          </div>
+          <div class="stat-label">Korban Indonesia</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-head">
+          <h2>Daftar Korban</h2>
+          <div class="btn-row">
+            <button id="filter-all" type="button" class="btn btn-secondary btn-sm filter-active">
+              Semua ({victims.length})
+            </button>
+            <button id="filter-id" type="button" class="btn btn-secondary btn-sm">
+              {countryFlag('ID')} Indonesia ({indonesiaCount})
+            </button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Korban</th>
+                <th>Grup</th>
+                <th>Negara</th>
+                <th>Sektor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {victims.map((v) => (
+                <tr data-country={v.country}>
+                  <td class="nowrap">{formatDate(v.attackdate)}</td>
+                  <td>
+                    {v.url ? (
+                      <a href={v.url} target="_blank" rel="noopener noreferrer">{v.victim}</a>
+                    ) : (
+                      v.victim
+                    )}
+                  </td>
+                  <td><span class="badge badge-malicious">{v.group}</span></td>
+                  <td class="nowrap">
+                    {v.country ? `${countryFlag(v.country)} ${v.country}` : '-'}
+                  </td>
+                  <td>{v.activity || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p id="filter-empty" class="empty-state" style="display:none;">
+          Tidak ada korban Indonesia di data terbaru -- bagus, tapi tetap waspada.
+        </p>
+      </div>
+    </>
+  )}
+
+  <style>
+    .table-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+    .table-head h2 {
+      margin: 0;
+    }
+    .btn-sm {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.82rem;
+    }
+    .filter-active {
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+    .table-scroll {
+      overflow-x: auto;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+  </style>
+
+  <script>
+    const btnAll = document.getElementById('filter-all');
+    const btnId = document.getElementById('filter-id');
+    const emptyMsg = document.getElementById('filter-empty');
+    const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('tbody tr[data-country]'));
+
+    function applyFilter(onlyIndonesia: boolean) {
+      let visible = 0;
+      for (const row of rows) {
+        const show = !onlyIndonesia || row.dataset.country === 'ID';
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      }
+      btnAll?.classList.toggle('filter-active', !onlyIndonesia);
+      btnId?.classList.toggle('filter-active', onlyIndonesia);
+      if (emptyMsg) emptyMsg.style.display = onlyIndonesia && visible === 0 ? 'block' : 'none';
+    }
+
+    btnAll?.addEventListener('click', () => applyFilter(false));
+    btnId?.addEventListener('click', () => applyFilter(true));
+  </script>
+</AppLayout>

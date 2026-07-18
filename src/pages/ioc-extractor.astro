@@ -42,6 +42,7 @@ if (!user) {
           <button id="bulk-btn" type="button" class="btn btn-secondary">Cek di Bulk Checker</button>
         </div>
       </div>
+      <p id="uncheckable-hint" class="hint" style="display:none; margin:0.75rem 0 0;"></p>
     </div>
 
     <div id="bucket-grid" class="bucket-grid"></div>
@@ -187,6 +188,15 @@ if (!user) {
       const checkable = checkableValues(result).length;
       bulkBtn.disabled = checkable === 0;
       bulkBtn.textContent = checkable > 0 ? `Cek di Bulk Checker (${checkable})` : 'Cek di Bulk Checker';
+
+      const uncheckable = result.total - checkable;
+      const hintEl = document.getElementById('uncheckable-hint')!;
+      if (uncheckable > 0) {
+        hintEl.textContent = `${uncheckable} IOC (email/subject) tidak didukung VirusTotal/AbuseIPDB/OTX, jadi tidak ikut ke Bulk Checker -- tetap tersedia di Export TXT untuk pencarian manual di email gateway/SIEM.`;
+        hintEl.style.display = 'block';
+      } else {
+        hintEl.style.display = 'none';
+      }
 
       resultWrap.style.display = result.total > 0 ? 'block' : 'none';
     }
