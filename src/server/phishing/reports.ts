@@ -49,3 +49,7 @@ export async function updatePhishingReportStatus(
 ): Promise<void> {
   await db.prepare(`UPDATE phishing_reports SET status = ? WHERE id = ?`).bind(status, id).run();
 }
+
+export async function deletePhishingReport(db: D1Database, id: number): Promise<void> {
+  await db.prepare(`DELETE FROM phishing_reports WHERE id = ?`).bind(id).run();
+}

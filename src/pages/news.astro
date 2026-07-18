@@ -20,11 +20,25 @@ function formatDate(value?: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('id-ID', {
+    weekday: 'long',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     timeZone: 'Asia/Jakarta',
   });
+}
+
+// Berita disimpan sampai 7 hari ke belakang -- kelompokkan per hari biar mudah
+// menelusuri berita hari-hari sebelumnya.
+const groups: { label: string; items: typeof news }[] = [];
+for (const item of news) {
+  const label = formatDate(item.pubDate) || 'Tanpa tanggal';
+  const last = groups[groups.length - 1];
+  if (last && last.label === label) {
+    last.items.push(item);
+  } else {
+    groups.push({ label, items: [item] });
+  }
 }
 ---
 
@@ -32,24 +46,42 @@ function formatDate(value?: string): string {
   <div class="page-header">
     <h1>Berita CVE &amp; Ransomware Terbaru</h1>
     <p>
-      Diambil otomatis tiap 6 jam dari The Hacker News dan BleepingComputer.
+      Diambil otomatis tiap 6 jam dari The Hacker News dan BleepingComputer, tersimpan sampai
+      7 hari ke belakang.
       {res?.updatedAt && ` Terakhir diperbarui: ${formatDate(res.updatedAt)}.`}
     </p>
   </div>
 
   {news.length === 0 && <p class="empty-state">Belum ada data cache. Cron job pengambil berita jalan tiap 6 jam.</p>}
 
-  <div class="news-list">
-    {news.map((item) => (
-      <a href={item.link} target="_blank" rel="noopener" class="card news-item">
-        <span class="badge badge-unknown">{item.source}</span>
-        <h2>{item.title}</h2>
-        {formatDate(item.pubDate) && <time class="news-date">{formatDate(item.pubDate)}</time>}
-      </a>
-    ))}
-  </div>
+  {groups.map((group) => (
+    <section class="news-day">
+      <h2 class="day-heading">{group.label}</h2>
+      <div class="news-list">
+        {group.items.map((item) => (
+          <a href={item.link} target="_blank" rel="noopener" class="card news-item">
+            <span class="badge badge-unknown">{item.source}</span>
+            <h3>{item.title}</h3>
+          </a>
+        ))}
+      </div>
+    </section>
+  ))}
 
   <style>
+    .news-day {
+      margin-bottom: 1.75rem;
+    }
+    .day-heading {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 0 0 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
     .news-list {
       display: flex;
       flex-direction: column;
@@ -68,18 +100,12 @@ function formatDate(value?: string): string {
     .news-item:hover {
       border-color: var(--brand);
     }
-    .news-item h2 {
+    .news-item h3 {
       margin: 0;
       font-size: 0.95rem;
       font-weight: 500;
       color: var(--text);
       flex: 1;
-    }
-    .news-date {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      white-space: nowrap;
-      margin-left: auto;
     }
   </style>
 </PageLayout>

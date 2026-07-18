@@ -35,7 +35,11 @@ const FEEDS: { urls: string[]; source: string }[] = [
 ];
 
 const MAX_ITEMS_PER_FEED = 15;
-const MAX_TOTAL_ITEMS = 30;
+// Berita lama tetap disimpan sampai 7 hari (digabung dengan hasil fetch baru tiap
+// refresh, dedupe per link), supaya halaman Berita tidak "kehilangan" berita
+// kemarin setiap cache di-overwrite. Cap total sebagai pengaman ukuran KV.
+const NEWS_RETENTION_DAYS = 7;
+const MAX_RETAINED_ITEMS = 150;
 
 function decodeEntities(str: string): string {
   return str
@@ -106,10 +110,23 @@ async function fetchFeed(feed: { urls: string[]; source: string }): Promise<News
 
 async function updateNewsCache(env: Env): Promise<number> {
   const perFeed = await Promise.all(FEEDS.map(fetchFeed));
-  const items = perFeed
-    .flat()
+  const fresh = perFeed.flat();
+
+  const existing = (await env.NEWS_CACHE.get('cve-latest', 'json')) as { items?: NewsItem[] } | null;
+  const cutoff = Date.now() - NEWS_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  // Gabung cache lama + hasil baru: dedupe per link (item baru menang), buang
+  // yang lebih tua dari masa retensi atau tanggalnya tidak bisa diparse.
+  const byLink = new Map<string, NewsItem>();
+  for (const item of [...(existing?.items ?? []), ...fresh]) {
+    const time = new Date(item.pubDate).getTime();
+    if (Number.isNaN(time) || time < cutoff) continue;
+    byLink.set(item.link, item);
+  }
+
+  const items = [...byLink.values()]
     .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
-    .slice(0, MAX_TOTAL_ITEMS);
+    .slice(0, MAX_RETAINED_ITEMS);
 
   await env.NEWS_CACHE.put('cve-latest', JSON.stringify({ items, updatedAt: new Date().toISOString() }));
   return items.length;

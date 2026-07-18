@@ -19,19 +19,104 @@ const currentMonth = new Date().toISOString().slice(0, 7);
 <AppLayout title="Report Bulanan" user={user}>
   <div class="page-header">
     <h1>Report Bulanan</h1>
-    <p>Pilih bulan, lalu download rekap pengecekan IOC per anggota tim dalam format PDF atau Excel.</p>
+    <p>Pilih bulan untuk melihat rekap pengecekan IOC per anggota tim, lalu download sebagai PDF atau Excel.</p>
   </div>
 
-  <div class="card" style="max-width: 360px;">
+  <div class="card">
     <form method="get" action="/api/reports/monthly.pdf">
-      <div class="field">
+      <div class="field" style="max-width: 260px;">
         <label for="report-month">Bulan</label>
         <input type="month" id="report-month" name="month" value={currentMonth} required />
       </div>
-      <div class="btn-row">
+
+      <div class="preview-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Email</th>
+              <th>Total Cek</th>
+              <th>Malicious</th>
+              <th>Suspicious</th>
+              <th>Clean</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+        <p id="preview-status" class="empty-state" style="display:none;"></p>
+      </div>
+
+      <div class="btn-row" style="margin-top: 1rem;">
         <button type="submit" formaction="/api/reports/monthly.pdf" class="btn">Download PDF</button>
         <button type="submit" formaction="/api/reports/monthly.xlsx" class="btn btn-secondary">Download Excel</button>
       </div>
     </form>
   </div>
+
+  <style>
+    .preview-wrap {
+      overflow-x: auto;
+    }
+  </style>
+
+  <script>
+    interface MonthlyRow {
+      full_name: string;
+      email: string;
+      total_checks: number;
+      malicious_count: number;
+      suspicious_count: number;
+      clean_count: number;
+    }
+
+    const monthInput = document.getElementById('report-month') as HTMLInputElement;
+    const previewBody = document.getElementById('preview-body')!;
+    const previewStatus = document.getElementById('preview-status') as HTMLParagraphElement;
+
+    async function loadPreview() {
+      previewBody.innerHTML = '';
+      previewStatus.style.display = 'block';
+      previewStatus.textContent = 'Memuat data...';
+
+      try {
+        const res = await fetch(`/api/reports/monthly.json?month=${encodeURIComponent(monthInput.value)}`);
+        const data = (await res.json()) as { rows?: MonthlyRow[]; error?: string };
+
+        if (!res.ok) {
+          previewStatus.textContent = data.error ?? 'Gagal memuat data';
+          return;
+        }
+
+        const rows = data.rows ?? [];
+        if (rows.length === 0) {
+          previewStatus.textContent = 'Belum ada data pengecekan di bulan ini.';
+          return;
+        }
+
+        previewStatus.style.display = 'none';
+        for (const row of rows) {
+          const tr = document.createElement('tr');
+          const cells = [
+            row.full_name,
+            row.email,
+            String(row.total_checks),
+            String(row.malicious_count),
+            String(row.suspicious_count),
+            String(row.clean_count),
+          ];
+          for (const value of cells) {
+            const td = document.createElement('td');
+            td.textContent = value;
+            tr.appendChild(td);
+          }
+          previewBody.appendChild(tr);
+        }
+      } catch {
+        previewStatus.textContent = 'Gagal memuat data';
+      }
+    }
+
+    monthInput.addEventListener('change', loadPreview);
+    loadPreview();
+  </script>
 </AppLayout>

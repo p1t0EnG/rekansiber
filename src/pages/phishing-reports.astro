@@ -32,7 +32,11 @@ const reports = await listPhishingReports(db);
       </div>
       <div class="field">
         <label for="hosting-email">Email abuse hosting provider (opsional)</label>
-        <input id="hosting-email" type="email" placeholder="abuse@hostingprovider.com" />
+        <div class="email-row">
+          <input id="hosting-email" type="email" placeholder="abuse@hostingprovider.com" />
+          <button type="button" id="whois-btn" class="btn btn-secondary btn-sm">Isi otomatis (WHOIS)</button>
+        </div>
+        <p id="whois-hint" class="hint" style="margin:0.4rem 0 0;"></p>
       </div>
       <div class="field">
         <label for="notes">Catatan/bukti (opsional)</label>
@@ -76,6 +80,11 @@ const reports = await listPhishingReports(db);
                   Tandai Selesai
                 </button>
               )}
+              {(user.role === 'admin' || r.user_id === user.id) && (
+                <button class="delete-report-btn btn btn-secondary btn-sm btn-danger" data-id={r.id} data-domain={r.target_domain}>
+                  Hapus
+                </button>
+              )}
             </td>
           </tr>
         ))}
@@ -104,6 +113,23 @@ const reports = await listPhishingReports(db);
     .btn-sm {
       padding: 0.4rem 0.85rem;
       font-size: 0.82rem;
+    }
+    .btn-danger {
+      color: var(--danger);
+    }
+    .btn-danger:hover {
+      border-color: var(--danger);
+    }
+    .email-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .email-row input {
+      flex: 1;
+      min-width: 220px;
+      width: auto;
     }
     .modal-overlay {
       position: fixed;
@@ -185,6 +211,77 @@ const reports = await listPhishingReports(db);
         });
         window.location.reload();
       });
+    });
+
+    // --- Hapus laporan (admin: semua, member: miliknya sendiri) ---
+    document.querySelectorAll<HTMLButtonElement>('.delete-report-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Hapus laporan untuk "${btn.dataset.domain}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+
+        const res = await fetch(`/api/phishing-reports/${btn.dataset.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          alert(data.error ?? 'Gagal menghapus laporan');
+          return;
+        }
+        window.location.reload();
+      });
+    });
+
+    // --- Auto-isi email abuse dari WHOIS (RDAP) ---
+    interface AbuseLookupResult {
+      domain: string;
+      ip: string | null;
+      registrarName: string | null;
+      registrarAbuseEmails: string[];
+      hostingName: string | null;
+      hostingAbuseEmails: string[];
+    }
+
+    const whoisBtn = document.getElementById('whois-btn') as HTMLButtonElement;
+    const whoisHint = document.getElementById('whois-hint')!;
+    const hostingEmailInput = document.getElementById('hosting-email') as HTMLInputElement;
+    const targetDomainInput = document.getElementById('target-domain') as HTMLInputElement;
+
+    whoisBtn.addEventListener('click', async () => {
+      const domain = targetDomainInput.value.trim();
+      if (!domain) {
+        whoisHint.textContent = 'Isi dulu kolom domain/URL phishing di atas.';
+        return;
+      }
+
+      whoisBtn.disabled = true;
+      whoisHint.textContent = 'Mencari kontak abuse via WHOIS...';
+      try {
+        const res = await fetch(`/api/phishing-reports/abuse-lookup?domain=${encodeURIComponent(domain)}`);
+        const data = (await res.json()) as AbuseLookupResult & { error?: string };
+
+        if (!res.ok) {
+          whoisHint.textContent = data.error ?? 'Gagal melakukan lookup WHOIS';
+          return;
+        }
+
+        // Email abuse hosting paling relevan untuk takedown; registrar jadi cadangan.
+        const best = data.hostingAbuseEmails[0] ?? data.registrarAbuseEmails[0] ?? '';
+        if (best) hostingEmailInput.value = best;
+
+        const parts: string[] = [];
+        if (data.hostingName || data.hostingAbuseEmails.length) {
+          parts.push(`Hosting: ${data.hostingName ?? '?'}${data.hostingAbuseEmails[0] ? ` (${data.hostingAbuseEmails[0]})` : ''}`);
+        }
+        if (data.registrarName || data.registrarAbuseEmails.length) {
+          parts.push(`Registrar: ${data.registrarName ?? '?'}${data.registrarAbuseEmails[0] ? ` (${data.registrarAbuseEmails[0]})` : ''}`);
+        }
+        if (data.ip) parts.push(`IP: ${data.ip}`);
+
+        whoisHint.textContent = best
+          ? `Terisi otomatis. ${parts.join(' | ')}`
+          : `Kontak abuse tidak ditemukan otomatis -- isi manual. ${parts.join(' | ') || 'WHOIS tidak mengembalikan data.'}`;
+      } catch {
+        whoisHint.textContent = 'Gagal melakukan lookup WHOIS';
+      } finally {
+        whoisBtn.disabled = false;
+      }
     });
   </script>
 </AppLayout>

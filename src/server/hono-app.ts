@@ -15,9 +15,11 @@ import {
   getPhishingReport,
   createPhishingReport,
   updatePhishingReportStatus,
+  deletePhishingReport,
   type PhishingReportStatus,
 } from './phishing/reports';
 import { generatePhishingReportTemplate } from './phishing/template';
+import { lookupAbuseContacts } from './phishing/whois';
 
 // Bindings ini datang dari wrangler.toml (D1, KV) + .dev.vars / dashboard (API keys)
 type Bindings = {
@@ -221,6 +223,17 @@ app.get('/reports/monthly.pdf', requireAuth, requireRole('admin'), async (c) => 
   });
 });
 
+// Data mentah untuk preview di halaman /reports sebelum di-download
+app.get('/reports/monthly.json', requireAuth, requireRole('admin'), async (c) => {
+  const month = resolveReportMonth(c);
+  if (!month) {
+    return c.json({ error: 'Parameter month harus format YYYY-MM' }, 400);
+  }
+
+  const rows = await getMonthlyStats(c.env.DB, month);
+  return c.json({ month, rows });
+});
+
 app.get('/reports/monthly.xlsx', requireAuth, requireRole('admin'), async (c) => {
   const month = resolveReportMonth(c);
   if (!month) {
@@ -267,6 +280,28 @@ app.post('/phishing-reports', requireAuth, async (c) => {
   return c.json({ id }, 201);
 });
 
+// Cari email abuse hosting/registrar dari WHOIS (RDAP) untuk auto-isi form laporan.
+app.get('/phishing-reports/abuse-lookup', requireAuth, async (c) => {
+  const raw = c.req.query('domain')?.trim() ?? '';
+  if (!raw) {
+    return c.json({ error: 'Parameter domain wajib diisi' }, 400);
+  }
+
+  // Terima juga input berupa URL penuh -- ambil hostname-nya saja
+  let host = raw;
+  try {
+    host = new URL(raw.includes('://') ? raw : `https://${raw}`).hostname;
+  } catch {
+    return c.json({ error: 'Domain tidak valid' }, 400);
+  }
+  if (!isValidIoc(host, 'domain')) {
+    return c.json({ error: 'Domain tidak valid' }, 400);
+  }
+
+  const result = await lookupAbuseContacts(host);
+  return c.json(result);
+});
+
 app.patch('/phishing-reports/:id', requireAuth, async (c) => {
   const id = Number(c.req.param('id'));
   const body = await c.req.json<{ status: PhishingReportStatus }>().catch(() => null);
@@ -282,6 +317,27 @@ app.patch('/phishing-reports/:id', requireAuth, async (c) => {
 
   await updatePhishingReportStatus(c.env.DB, id, body.status);
   return c.json({ message: 'Status diperbarui' });
+});
+
+// Hapus laporan: admin boleh hapus semua, member hanya laporan buatannya sendiri.
+app.delete('/phishing-reports/:id', requireAuth, async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.json({ error: 'id tidak valid' }, 400);
+  }
+
+  const existing = await getPhishingReport(c.env.DB, id);
+  if (!existing) {
+    return c.json({ error: 'Report tidak ditemukan' }, 404);
+  }
+
+  const user = c.get('user');
+  if (user.role !== 'admin' && existing.user_id !== user.id) {
+    return c.json({ error: 'Hanya admin atau pembuat laporan yang bisa menghapus' }, 403);
+  }
+
+  await deletePhishingReport(c.env.DB, id);
+  return c.json({ message: 'Laporan dihapus' });
 });
 
 app.get('/phishing-reports/:id/template', requireAuth, async (c) => {
