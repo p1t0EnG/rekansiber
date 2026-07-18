@@ -1,0 +1,258 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<AppLayout title="IOC Extractor" user={user}>
+  <div class="page-header">
+    <h1>IOC Extractor</h1>
+    <p>
+      Upload dokumen threat intel (.docx/.txt) -- semua IOC di dalamnya (hash, domain, IP, URL,
+      email) diambil otomatis, di-refang, dan siap di-export. Dokumen diproses sepenuhnya di
+      browser kamu, tidak pernah diupload ke server.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="doc-file">File dokumen (.docx, .txt, .csv)</label>
+      <input id="doc-file" type="file" accept=".docx,.txt,.csv,.log" />
+    </div>
+    <p id="extract-status" class="status-message" role="status"></p>
+  </div>
+
+  <div id="result-wrap" style="display:none;">
+    <div class="card">
+      <div class="result-head">
+        <div>
+          <h2 id="result-title" style="margin-bottom:0.25rem;"></h2>
+          <p id="result-mode" class="hint" style="margin:0;"></p>
+        </div>
+        <div class="btn-row">
+          <button id="export-btn" type="button" class="btn">Export TXT</button>
+          <button id="copy-btn" type="button" class="btn btn-secondary">Copy Semua</button>
+          <button id="bulk-btn" type="button" class="btn btn-secondary">Cek di Bulk Checker</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bucket-grid" class="bucket-grid"></div>
+  </div>
+
+  <style>
+    .result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .bucket-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .bucket-card {
+      margin-bottom: 0;
+    }
+    .bucket-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.6rem;
+    }
+    .bucket-card-head strong {
+      font-size: 0.95rem;
+    }
+    .bucket-values {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.8rem;
+      margin: 0;
+      max-height: 260px;
+      overflow: auto;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      white-space: pre;
+    }
+  </style>
+
+  <script>
+    import JSZip from 'jszip';
+    import {
+      extractIocs,
+      buildExportText,
+      checkableValues,
+      BUCKET_LABELS,
+      BUCKET_ORDER,
+      type ExtractedIocs,
+    } from '../server/ioc/extract';
+
+    const MAX_FILE_BYTES = 15 * 1024 * 1024;
+    const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+    const fileInput = document.getElementById('doc-file') as HTMLInputElement;
+    const statusEl = document.getElementById('extract-status')!;
+    const resultWrap = document.getElementById('result-wrap') as HTMLDivElement;
+    const resultTitle = document.getElementById('result-title')!;
+    const resultMode = document.getElementById('result-mode')!;
+    const bucketGrid = document.getElementById('bucket-grid')!;
+    const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
+    const copyBtn = document.getElementById('copy-btn') as HTMLButtonElement;
+    const bulkBtn = document.getElementById('bulk-btn') as HTMLButtonElement;
+
+    let lastResult: ExtractedIocs | null = null;
+    let lastFileName = '';
+
+    function setStatus(message: string, tone?: 'error' | 'success') {
+      statusEl.textContent = message;
+      if (tone) statusEl.setAttribute('data-tone', tone);
+      else statusEl.removeAttribute('data-tone');
+    }
+
+    // .docx = ZIP berisi word/document.xml; tiap <w:p> adalah satu paragraf/baris.
+    async function docxToText(buffer: ArrayBuffer): Promise<string> {
+      const zip = await JSZip.loadAsync(buffer);
+      const docEntry = zip.file('word/document.xml');
+      if (!docEntry) throw new Error('File .docx tidak valid (word/document.xml tidak ditemukan)');
+
+      const xml = await docEntry.async('string');
+      const parsed = new DOMParser().parseFromString(xml, 'application/xml');
+      const paragraphs = parsed.getElementsByTagNameNS(WORD_NS, 'p');
+
+      if (paragraphs.length > 0) {
+        return Array.from(paragraphs)
+          .map((p) => p.textContent ?? '')
+          .join('\n');
+      }
+      // Fallback kasar kalau namespace tidak cocok
+      return xml
+        .replace(/<w:p\b/g, '\n<w:p')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+    }
+
+    function renderResult(result: ExtractedIocs) {
+      resultTitle.textContent = `${result.total} IOC ditemukan`;
+      resultMode.textContent =
+        result.mode === 'section'
+          ? 'Terdeteksi format laporan -- hanya blok "Indicator of compromise" yang diambil.'
+          : 'Header "Indicator of compromise" tidak ditemukan -- seluruh teks dipindai (hash, email, dan IOC ber-defang).';
+
+      bucketGrid.innerHTML = '';
+      for (const bucket of BUCKET_ORDER) {
+        const values = result[bucket];
+        if (!values.length) continue;
+
+        const card = document.createElement('div');
+        card.className = 'card bucket-card';
+
+        const head = document.createElement('div');
+        head.className = 'bucket-card-head';
+
+        const name = document.createElement('strong');
+        name.textContent = BUCKET_LABELS[bucket];
+
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-unknown';
+        badge.textContent = String(values.length);
+
+        head.appendChild(name);
+        head.appendChild(badge);
+
+        const list = document.createElement('pre');
+        list.className = 'bucket-values';
+        list.textContent = values.join('\n');
+
+        card.appendChild(head);
+        card.appendChild(list);
+        bucketGrid.appendChild(card);
+      }
+
+      const checkable = checkableValues(result).length;
+      bulkBtn.disabled = checkable === 0;
+      bulkBtn.textContent = checkable > 0 ? `Cek di Bulk Checker (${checkable})` : 'Cek di Bulk Checker';
+
+      resultWrap.style.display = result.total > 0 ? 'block' : 'none';
+    }
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      resultWrap.style.display = 'none';
+      lastResult = null;
+      lastFileName = file.name;
+
+      if (file.size > MAX_FILE_BYTES) {
+        setStatus('File terlalu besar (maksimal 15 MB)', 'error');
+        return;
+      }
+
+      setStatus('Memproses dokumen...');
+      try {
+        let text: string;
+        if (/\.docx$/i.test(file.name)) {
+          text = await docxToText(await file.arrayBuffer());
+        } else if (/\.(txt|csv|log)$/i.test(file.name)) {
+          text = await file.text();
+        } else {
+          setStatus('Format tidak didukung -- gunakan .docx, .txt, atau .csv', 'error');
+          return;
+        }
+
+        const result = extractIocs(text);
+        lastResult = result;
+        renderResult(result);
+
+        if (result.total === 0) {
+          setStatus('Tidak ada IOC yang ditemukan di dokumen ini', 'error');
+        } else {
+          setStatus(`Selesai: ${result.total} IOC diekstrak dari ${file.name}`, 'success');
+        }
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : 'Gagal memproses dokumen', 'error');
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if (!lastResult) return;
+      const blob = new Blob([buildExportText(lastResult, lastFileName)], {
+        type: 'text/plain;charset=utf-8;',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${lastFileName.replace(/\.[^.]+$/, '')}_IOC.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      if (!lastResult) return;
+      await navigator.clipboard.writeText(buildExportText(lastResult, lastFileName));
+      setStatus('Semua IOC disalin ke clipboard', 'success');
+    });
+
+    bulkBtn.addEventListener('click', () => {
+      if (!lastResult) return;
+      sessionStorage.setItem('rekansiber:bulk-prefill', checkableValues(lastResult).join('\n'));
+      window.location.href = '/bulk-checker';
+    });
+  </script>
+</AppLayout>

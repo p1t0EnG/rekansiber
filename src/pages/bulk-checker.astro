@@ -74,6 +74,17 @@ if (!user) {
 
     let lastResults: BulkResultItem[] = [];
 
+    // Hasil kiriman dari halaman IOC Extractor ("Cek di Bulk Checker")
+    const prefill = sessionStorage.getItem('rekansiber:bulk-prefill');
+    if (prefill) {
+      sessionStorage.removeItem('rekansiber:bulk-prefill');
+      textarea.value = prefill;
+      const count = prefill.split('\n').filter(Boolean).length;
+      statusEl.textContent =
+        `${count} IOC dimuat dari IOC Extractor` +
+        (count > MAX_BULK_ITEMS ? ` -- maksimal ${MAX_BULK_ITEMS} per batch, kurangi dulu sebelum cek` : '');
+    }
+
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0];
       if (!file) return;
