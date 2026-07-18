@@ -17,9 +17,21 @@ interface NewsItem {
 
 // RansomHub itu nama grup ransomware (situs kebocoran korban), bukan sumber berita --
 // dipakai BleepingComputer (kategori ransomware kuat) sebagai gantinya untuk berita ransomware.
-const FEEDS: { url: string; source: string }[] = [
-  { url: 'https://feeds.feedburner.com/TheHackersNews', source: 'The Hacker News' },
-  { url: 'https://www.bleepingcomputer.com/feed/', source: 'BleepingComputer' },
+//
+// Tiap feed boleh punya beberapa URL kandidat, dicoba berurutan sampai ada yang
+// menghasilkan item. BleepingComputer memblokir fetch dari IP Cloudflare Workers
+// (feed-nya balas halaman challenge "Just a moment..."), jadi kandidat kedua
+// mengambil artikel BC terbaru lewat Bing News RSS (Google News juga blokir IP
+// Workers dengan halaman "Sorry...", FeedBurner mirror-nya sudah lama basi).
+const FEEDS: { urls: string[]; source: string }[] = [
+  { urls: ['https://feeds.feedburner.com/TheHackersNews'], source: 'The Hacker News' },
+  {
+    urls: [
+      'https://www.bleepingcomputer.com/feed/',
+      'https://www.bing.com/news/search?q=site%3Ableepingcomputer.com&format=rss',
+    ],
+    source: 'BleepingComputer',
+  },
 ];
 
 const MAX_ITEMS_PER_FEED = 15;
@@ -43,13 +55,27 @@ function extractTag(itemXml: string, tag: string): string {
   return plainMatch ? decodeEntities(plainMatch[1].trim()) : '';
 }
 
+// Link dari Bing News berupa redirect apiclick.aspx?...&url=<artikel asli> --
+// ambil URL artikel aslinya supaya user langsung ke sumbernya.
+function unwrapAggregatorLink(link: string): string {
+  if (!link.includes('bing.com/news/apiclick')) return link;
+  try {
+    const direct = new URL(link).searchParams.get('url');
+    return direct && /^https?:\/\//.test(direct) ? direct : link;
+  } catch {
+    return link;
+  }
+}
+
 function parseRss(xml: string, source: string): NewsItem[] {
   const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
   const items: NewsItem[] = [];
 
   for (const itemXml of itemMatches.slice(0, MAX_ITEMS_PER_FEED)) {
-    const title = extractTag(itemXml, 'title');
-    const link = extractTag(itemXml, 'link');
+    // Item dari agregator kadang diberi suffix " - NamaSumber" di judulnya --
+    // dibuang karena kolom sumber sudah ditampilkan terpisah di halaman Berita.
+    const title = extractTag(itemXml, 'title').replace(new RegExp(` - ${source}$`), '');
+    const link = unwrapAggregatorLink(extractTag(itemXml, 'link'));
     const pubDate = extractTag(itemXml, 'pubDate');
     if (title && link) {
       items.push({ title, link, pubDate, source });
@@ -59,14 +85,23 @@ function parseRss(xml: string, source: string): NewsItem[] {
   return items;
 }
 
-async function fetchFeed(feed: { url: string; source: string }): Promise<NewsItem[]> {
-  try {
-    const res = await fetch(feed.url, { headers: { 'User-Agent': 'RekanSiberNewsBot/1.0' } });
-    if (!res.ok) return [];
-    return parseRss(await res.text(), feed.source);
-  } catch {
-    return [];
+async function fetchFeed(feed: { urls: string[]; source: string }): Promise<NewsItem[]> {
+  for (const url of feed.urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; RekanSiberNewsBot/1.0)',
+          Accept: 'application/rss+xml, application/xml, text/xml',
+        },
+      });
+      if (!res.ok) continue;
+      const items = parseRss(await res.text(), feed.source);
+      if (items.length > 0) return items;
+    } catch {
+      // coba URL kandidat berikutnya
+    }
   }
+  return [];
 }
 
 async function updateNewsCache(env: Env): Promise<number> {

@@ -29,7 +29,6 @@ const teamLinks = [
   { href: '/bulk-checker', label: 'Bulk Checker', icon: 'bulk', adminOnly: false },
   { href: '/ioc-extractor', label: 'IOC Extractor', icon: 'extract', adminOnly: false },
   { href: '/phishing-reports', label: 'Phishing Report', icon: 'phishing', adminOnly: false },
-  { href: '/ransomware-watch', label: 'Ransomware Watch', icon: 'ransom', adminOnly: false },
   { href: '/reports', label: 'Report Bulanan', icon: 'report', adminOnly: true },
   { href: '/profile', label: 'Profile', icon: 'profile', adminOnly: false },
 ].filter((link) => !link.adminOnly || role === 'admin');
@@ -38,6 +37,7 @@ const publicLinks = [
   { href: '/', label: 'Beranda', icon: 'home' },
   { href: '/ioc-checker', label: 'IOC Checker', icon: 'search' },
   { href: '/news', label: 'Berita', icon: 'news' },
+  { href: '/ransomware-watch', label: 'Ransomware Watch', icon: 'ransom' },
 ];
 
 const initial = (user?.full_name ?? '?').trim().slice(0, 1).toUpperCase();

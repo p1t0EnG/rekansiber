@@ -1,4 +1,4 @@
-export type IocType = 'ip' | 'domain' | 'hash' | 'url';
+export type IocType = 'ip' | 'domain' | 'hash' | 'url' | 'email';
 
 export type Verdict = 'clean' | 'suspicious' | 'malicious' | 'unknown';
 

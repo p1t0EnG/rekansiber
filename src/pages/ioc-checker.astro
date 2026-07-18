@@ -12,7 +12,7 @@ const PageLayout = user ? AppLayout : Layout;
 <PageLayout title="IOC Checker" user={user}>
   <div class="page-header">
     <h1>IOC Checker</h1>
-    <p>Masukkan IP, domain, hash, atau URL.</p>
+    <p>Masukkan IP, domain, hash, URL, atau alamat email.</p>
   </div>
 
   <div class="card">
@@ -20,7 +20,7 @@ const PageLayout = user ? AppLayout : Layout;
       <div class="field">
         <label for="ioc-value">Value</label>
         <div class="input-row">
-          <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f" required autocomplete="off" />
+          <input id="ioc-value" name="value" type="text" placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f atau nama@domain.com" required autocomplete="off" />
           <span id="ioc-type-badge" class="badge" style="display:none;"></span>
         </div>
       </div>
@@ -126,11 +126,13 @@ const PageLayout = user ? AppLayout : Layout;
     const resultProvidersEl = document.getElementById('result-providers')!;
 
     // Link ke halaman pengecekan resmi tiap provider, biar analyst bisa lihat detail lengkap.
+    // Untuk email, VT/OTX/MXToolbox mengecek DOMAIN-nya (bagian setelah '@').
     function buildProviderLink(providerName: string, type: string, value: string): string | null {
-      const encoded = encodeURIComponent(value);
+      const lookup = type === 'email' ? (value.split('@')[1] ?? '') : value;
+      const encoded = encodeURIComponent(lookup);
       if (providerName === 'VirusTotal') {
         if (type === 'ip') return `https://www.virustotal.com/gui/ip-address/${encoded}`;
-        if (type === 'domain') return `https://www.virustotal.com/gui/domain/${encoded}`;
+        if (type === 'domain' || type === 'email') return `https://www.virustotal.com/gui/domain/${encoded}`;
         if (type === 'hash') return `https://www.virustotal.com/gui/file/${encoded}`;
         if (type === 'url') return `https://www.virustotal.com/gui/search/${encoded}`;
       }
@@ -139,9 +141,12 @@ const PageLayout = user ? AppLayout : Layout;
       }
       if (providerName === 'OTX') {
         if (type === 'ip') return `https://otx.alienvault.com/indicator/ip/${encoded}`;
-        if (type === 'domain') return `https://otx.alienvault.com/indicator/domain/${encoded}`;
+        if (type === 'domain' || type === 'email') return `https://otx.alienvault.com/indicator/domain/${encoded}`;
         if (type === 'hash') return `https://otx.alienvault.com/indicator/file/${encoded}`;
         if (type === 'url') return `https://otx.alienvault.com/indicator/url/${encoded}`;
+      }
+      if (providerName === 'MXToolbox') {
+        if (type === 'email') return `https://mxtoolbox.com/SuperTool.aspx?action=blacklist%3a${encoded}&run=toolpage`;
       }
       return null;
     }
@@ -151,6 +156,7 @@ const PageLayout = user ? AppLayout : Layout;
       domain: 'Domain',
       hash: 'File Hash',
       url: 'URL',
+      email: 'Email',
     };
 
     valueInput.addEventListener('input', () => {
@@ -221,7 +227,7 @@ const PageLayout = user ? AppLayout : Layout;
       const type = detectIocType(value);
 
       if (!type) {
-        errorEl.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash (MD5/SHA1/SHA256), atau URL yang valid.';
+        errorEl.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash (MD5/SHA1/SHA256), URL, atau alamat email yang valid.';
         return;
       }
 

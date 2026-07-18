@@ -26,6 +26,7 @@ type Bindings = {
   VT_API_KEY: string;
   ABUSEIPDB_API_KEY: string;
   OTX_API_KEY: string;
+  MXTOOLBOX_API_KEY?: string;
   SESSION_SECRET: string;
 };
 
@@ -34,7 +35,7 @@ type AppEnv = { Bindings: Bindings; Variables: Variables };
 
 const app = new Hono<AppEnv>().basePath('/api');
 
-const VALID_TYPES: IocType[] = ['ip', 'domain', 'hash', 'url'];
+const VALID_TYPES: IocType[] = ['ip', 'domain', 'hash', 'url', 'email'];
 
 // --- Health check, buat mastiin deploy berhasil ---
 app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString() }));

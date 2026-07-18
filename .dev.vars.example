@@ -5,6 +5,11 @@ VT_API_KEY=isi_api_key_virustotal_disini
 ABUSEIPDB_API_KEY=isi_api_key_abuseipdb_disini
 OTX_API_KEY=isi_api_key_otx_disini
 
+# Opsional -- untuk pengecekan IOC email (blacklist domain pengirim).
+# Daftar gratis di https://mxtoolbox.com/user/api lalu isi di sini.
+# Tanpa key ini, hasil MXToolbox tampil "belum dikonfigurasi".
+MXTOOLBOX_API_KEY=isi_api_key_mxtoolbox_disini
+
 # String acak panjang untuk signing session/JWT. Generate dengan:
 # openssl rand -base64 48
 SESSION_SECRET=ganti_dengan_random_string_panjang_dan_acak

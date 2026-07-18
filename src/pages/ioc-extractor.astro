@@ -192,7 +192,7 @@ if (!user) {
       const uncheckable = result.total - checkable;
       const hintEl = document.getElementById('uncheckable-hint')!;
       if (uncheckable > 0) {
-        hintEl.textContent = `${uncheckable} IOC (email/subject) tidak didukung VirusTotal/AbuseIPDB/OTX, jadi tidak ikut ke Bulk Checker -- tetap tersedia di Export TXT untuk pencarian manual di email gateway/SIEM.`;
+        hintEl.textContent = `${uncheckable} IOC (subject/nama attachment) tidak didukung provider mana pun, jadi tidak ikut ke Bulk Checker -- tetap tersedia di Export TXT untuk pencarian manual di email gateway/SIEM.`;
         hintEl.style.display = 'block';
       } else {
         hintEl.style.display = 'none';

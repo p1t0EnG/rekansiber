@@ -147,10 +147,19 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 
 export const BUCKET_ORDER: Bucket[] = ['md5', 'sha1', 'sha256', 'ip', 'domain', 'url', 'email', 'other'];
 
-// Nilai yang bisa langsung dicek ke VT/AbuseIPDB/OTX lewat bulk checker
-// (email & subject tidak didukung provider, jadi tidak ikut).
+// Nilai yang bisa langsung dicek lewat bulk checker (hash/IP/domain/URL ke
+// VT/AbuseIPDB/OTX, email ke MXToolbox + VT/OTX via domain-nya).
+// Subject/nama attachment tidak didukung provider mana pun, jadi tidak ikut.
 export function checkableValues(result: ExtractedIocs): string[] {
-  return [...result.md5, ...result.sha1, ...result.sha256, ...result.ip, ...result.domain, ...result.url];
+  return [
+    ...result.md5,
+    ...result.sha1,
+    ...result.sha256,
+    ...result.ip,
+    ...result.domain,
+    ...result.url,
+    ...result.email,
+  ];
 }
 
 export function buildExportText(result: ExtractedIocs, sourceName: string): string {

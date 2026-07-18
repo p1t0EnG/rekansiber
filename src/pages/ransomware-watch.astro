@@ -1,14 +1,12 @@
 ---
+import Layout from '../layouts/Layout.astro';
 import AppLayout from '../layouts/AppLayout.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
 const user = token ? await getSessionUser(db, token) : null;
-
-if (!user) {
-  return Astro.redirect('/login');
-}
+const PageLayout = user ? AppLayout : Layout;
 
 interface RansomVictim {
   victim: string;
@@ -47,7 +45,7 @@ function countryFlag(iso: string): string {
 }
 ---
 
-<AppLayout title="Ransomware Watch" user={user}>
+<PageLayout title="Ransomware Watch" user={user}>
   <div class="page-header">
     <h1>Ransomware Watch</h1>
     <p>
@@ -179,4 +177,4 @@ function countryFlag(iso: string): string {
     btnAll?.addEventListener('click', () => applyFilter(false));
     btnId?.addEventListener('click', () => applyFilter(true));
   </script>
-</AppLayout>
+</PageLayout>
