@@ -46,6 +46,15 @@ if (!user) {
     </div>
 
     <div id="bucket-grid" class="bucket-grid"></div>
+
+    <div id="splunk-card" class="card" style="margin-top: 1rem; display:none;">
+      <h2>Query Splunk (Threat Hunting)</h2>
+      <p class="hint" style="margin: 0 0 1rem;">
+        Copy query di bawah lalu jalankan di Splunk untuk hunting IOC ini di log internal.
+        Sesuaikan rentang waktunya (time range) sebelum dijalankan.
+      </p>
+      <div id="splunk-list"></div>
+    </div>
   </div>
 
   <style>
@@ -87,6 +96,40 @@ if (!user) {
       line-height: 1.6;
       white-space: pre;
     }
+    .splunk-block {
+      margin-bottom: 1.25rem;
+    }
+    .splunk-block:last-child {
+      margin-bottom: 0;
+    }
+    .splunk-block-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .splunk-block-head strong {
+      font-size: 0.9rem;
+    }
+    .splunk-block-head .hint {
+      margin: 0;
+    }
+    .splunk-query {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.8rem;
+      margin: 0;
+      max-height: 180px;
+      overflow: auto;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
   </style>
 
   <script>
@@ -94,6 +137,7 @@ if (!user) {
     import {
       extractIocs,
       buildExportText,
+      buildSplunkQueries,
       checkableValues,
       BUCKET_LABELS,
       BUCKET_ORDER,
@@ -198,7 +242,65 @@ if (!user) {
         hintEl.style.display = 'none';
       }
 
+      renderSplunkQueries(result);
       resultWrap.style.display = result.total > 0 ? 'block' : 'none';
+    }
+
+    function renderSplunkQueries(result: ExtractedIocs) {
+      const card = document.getElementById('splunk-card') as HTMLDivElement;
+      const list = document.getElementById('splunk-list')!;
+      const queries = buildSplunkQueries(result);
+
+      list.innerHTML = '';
+      for (const q of queries) {
+        const block = document.createElement('div');
+        block.className = 'splunk-block';
+
+        const head = document.createElement('div');
+        head.className = 'splunk-block-head';
+
+        const info = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = q.label;
+        const desc = document.createElement('p');
+        desc.className = 'hint';
+        desc.textContent = q.description;
+        info.appendChild(name);
+        info.appendChild(desc);
+
+        const copyQueryBtn = document.createElement('button');
+        copyQueryBtn.type = 'button';
+        copyQueryBtn.className = 'btn btn-secondary';
+        copyQueryBtn.textContent = 'Copy Query';
+        copyQueryBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(q.query);
+          } catch {
+            // Fallback kalau clipboard API ditolak (mis. browser lama / tanpa izin)
+            const ta = document.createElement('textarea');
+            ta.value = q.query;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+          }
+          copyQueryBtn.textContent = 'Tersalin!';
+          setTimeout(() => (copyQueryBtn.textContent = 'Copy Query'), 1500);
+        });
+
+        head.appendChild(info);
+        head.appendChild(copyQueryBtn);
+
+        const pre = document.createElement('pre');
+        pre.className = 'splunk-query';
+        pre.textContent = q.query;
+
+        block.appendChild(head);
+        block.appendChild(pre);
+        list.appendChild(block);
+      }
+
+      card.style.display = queries.length > 0 ? 'block' : 'none';
     }
 
     fileInput.addEventListener('change', async () => {

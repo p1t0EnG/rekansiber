@@ -162,6 +162,85 @@ export function checkableValues(result: ExtractedIocs): string[] {
   ];
 }
 
+// --- Query Splunk untuk threat hunting ---
+// Index mengikuti environment SOC tim: fwpaloalto (log firewall Palo Alto) untuk
+// IOC network, symantec (log endpoint) untuk hash file, wineventlog untuk nama file.
+// Query berupa pencarian frasa OR di _raw supaya bisa langsung dipakai tanpa perlu
+// tahu nama field hasil ekstraksi masing-masing sourcetype.
+
+export interface SplunkQuery {
+  label: string;
+  description: string;
+  query: string;
+}
+
+function splEscape(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function toOrList(values: string[]): string {
+  return values.map((v) => `"${splEscape(v)}"`).join(' OR ');
+}
+
+const FILE_NAME_RE =
+  /\.(zip|rar|7z|exe|dll|js|jse|vbs|vbe|ps1|bat|cmd|scr|docm?|docx|xlsm?|xlsx|pptm?|pptx|pdf|iso|img|lnk|hta|jar|msi|apk|php|aspx?|jsp|html?|wsf|chm)$/i;
+
+function isLikelyFileName(value: string): boolean {
+  return !/\s/.test(value) && !value.includes('/') && FILE_NAME_RE.test(value);
+}
+
+// Nama file dikumpulkan dari bucket "other" (nama attachment) + nama file di
+// ujung path URL (mis. .../Amendment_Notice_TXN-123pdf.zip).
+function collectFileNames(result: ExtractedIocs): string[] {
+  const names = new Set<string>();
+  for (const value of result.other) {
+    if (isLikelyFileName(value)) names.add(value);
+  }
+  for (const url of result.url) {
+    try {
+      const segments = new URL(url).pathname.split('/');
+      const last = decodeURIComponent(segments[segments.length - 1] ?? '');
+      if (isLikelyFileName(last)) names.add(last);
+    } catch {
+      // URL tidak valid -- lewati
+    }
+  }
+  return [...names];
+}
+
+export function buildSplunkQueries(result: ExtractedIocs): SplunkQuery[] {
+  const queries: SplunkQuery[] = [];
+
+  const network = [...result.ip, ...result.domain, ...result.url];
+  if (network.length > 0) {
+    queries.push({
+      label: 'Network -- Palo Alto Firewall',
+      description: `${result.ip.length} IP, ${result.domain.length} domain, ${result.url.length} URL di index=fwpaloalto`,
+      query: `index=fwpaloalto (${toOrList(network)})`,
+    });
+  }
+
+  const hashes = [...result.md5, ...result.sha1, ...result.sha256];
+  if (hashes.length > 0) {
+    queries.push({
+      label: 'File Hash -- Symantec Endpoint',
+      description: `${hashes.length} hash (MD5/SHA-1/SHA-256) di index=symantec`,
+      query: `index=symantec (${toOrList(hashes)})`,
+    });
+  }
+
+  const fileNames = collectFileNames(result);
+  if (fileNames.length > 0) {
+    queries.push({
+      label: 'Nama File -- Windows Event Log',
+      description: `${fileNames.length} nama file di index=wineventlog`,
+      query: `index=wineventlog (${toOrList(fileNames)})`,
+    });
+  }
+
+  return queries;
+}
+
 export function buildExportText(result: ExtractedIocs, sourceName: string): string {
   let out = `# Rekan Siber - IOC Extractor\n# Sumber: ${sourceName}\n# Diekstrak: ${new Date().toISOString()}\n# Total: ${result.total} IOC\n\n`;
   for (const bucket of BUCKET_ORDER) {
