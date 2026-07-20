@@ -17,7 +17,6 @@ const icons: Record<string, string> = {
   report: `<path d="M6 2.5h9l4 4v15H6z"/><path d="M15 2.5v4h4"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/><line x1="9" y1="20" x2="12.5" y2="20"/>`,
   extract: `<path d="M6 2.5h9l4 4v15H6z"/><path d="M15 2.5v4h4"/><circle cx="11" cy="12.5" r="2.8"/><line x1="13.1" y1="14.6" x2="15.8" y2="17.3"/>`,
   ransom: `<circle cx="12" cy="12" r="8"/><line x1="12" y1="2.5" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="21.5" y2="12"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>`,
-  profile: `<circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c1.5-4 5-5.5 7.5-5.5s6 1.5 7.5 5.5"/>`,
   logout: `<path d="M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4"/><path d="M15 16l4-4-4-4"/><line x1="19" y1="12" x2="9" y2="12"/>`,
   home: `<path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/>`,
   search: `<circle cx="10.5" cy="10.5" r="6.5"/><line x1="19" y1="19" x2="15.2" y2="15.2"/>`,
@@ -30,7 +29,6 @@ const teamLinks = [
   { href: '/ioc-extractor', label: 'IOC Extractor', icon: 'extract', adminOnly: false },
   { href: '/phishing-reports', label: 'Phishing Report', icon: 'phishing', adminOnly: false },
   { href: '/reports', label: 'Report Bulanan', icon: 'report', adminOnly: true },
-  { href: '/profile', label: 'Profile', icon: 'profile', adminOnly: false },
 ].filter((link) => !link.adminOnly || role === 'admin');
 
 const publicLinks = [
@@ -77,13 +75,18 @@ const initial = (user?.full_name ?? '?').trim().slice(0, 1).toUpperCase();
   </nav>
 
   <div class="sidebar-footer">
-    <div class="sidebar-user">
+    <a
+      href="/profile"
+      class="sidebar-user"
+      class:list={{ active: isActive('/profile') }}
+      title="Buka Profile (info akun & ganti password)"
+    >
       <span class="avatar">{initial}</span>
       <span class="meta">
         <span class="name">{user?.full_name}</span>
         <span class="role">{user?.role}</span>
       </span>
-    </div>
+    </a>
     <button id="sidebar-logout" type="button" class="sidebar-link sidebar-logout-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" set:html={icons.logout} />
       <span>Logout</span>
@@ -216,8 +219,20 @@ const initial = (user?.full_name ?? '?').trim().slice(0, 1).toUpperCase();
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 0.35rem 0.62rem 0.6rem;
+    padding: 0.45rem 0.62rem;
+    margin-bottom: 0.2rem;
     white-space: nowrap;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+  }
+  .sidebar-user:hover {
+    background: var(--surface-2);
+  }
+  .sidebar-user.active {
+    background: rgba(56, 189, 248, 0.12);
+  }
+  .sidebar-user.active .name {
+    color: var(--brand);
   }
   .sidebar-user .avatar {
     width: 26px;

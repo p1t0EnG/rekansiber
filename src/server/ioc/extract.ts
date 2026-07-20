@@ -182,25 +182,28 @@ function toOrList(values: string[]): string {
   return values.map((v) => `"${splEscape(v)}"`).join(' OR ');
 }
 
-const FILE_NAME_RE =
-  /\.(zip|rar|7z|exe|dll|js|jse|vbs|vbe|ps1|bat|cmd|scr|docm?|docx|xlsm?|xlsx|pptm?|pptx|pdf|iso|img|lnk|hta|jar|msi|apk|php|aspx?|jsp|html?|wsf|chm)$/i;
+// Khusus file yang bisa dieksekusi/di-load (exe, dll, script, installer, dst.) --
+// itu yang relevan di-hunting sebagai jejak eksekusi di Windows Event Log.
+// Arsip/dokumen (zip, pdf, docx) sengaja tidak ikut ke query wineventlog.
+const EXEC_FILE_RE =
+  /\.(exe|dll|sys|com|scr|pif|msi|msix?|ps1|psm1|bat|cmd|vbs|vbe|js|jse|wsf|wsh|hta|lnk|chm|jar|cpl|ocx)$/i;
 
-function isLikelyFileName(value: string): boolean {
-  return !/\s/.test(value) && !value.includes('/') && FILE_NAME_RE.test(value);
+function isExecutableFileName(value: string): boolean {
+  return !/\s/.test(value) && !value.includes('/') && EXEC_FILE_RE.test(value);
 }
 
-// Nama file dikumpulkan dari bucket "other" (nama attachment) + nama file di
-// ujung path URL (mis. .../Amendment_Notice_TXN-123pdf.zip).
-function collectFileNames(result: ExtractedIocs): string[] {
+// Nama file executable dikumpulkan dari bucket "other" (nama attachment) + nama
+// file di ujung path URL (mis. .../loader.js atau .../install.res.1033.dll).
+function collectExecutableFileNames(result: ExtractedIocs): string[] {
   const names = new Set<string>();
   for (const value of result.other) {
-    if (isLikelyFileName(value)) names.add(value);
+    if (isExecutableFileName(value)) names.add(value);
   }
   for (const url of result.url) {
     try {
       const segments = new URL(url).pathname.split('/');
       const last = decodeURIComponent(segments[segments.length - 1] ?? '');
-      if (isLikelyFileName(last)) names.add(last);
+      if (isExecutableFileName(last)) names.add(last);
     } catch {
       // URL tidak valid -- lewati
     }
@@ -229,11 +232,11 @@ export function buildSplunkQueries(result: ExtractedIocs): SplunkQuery[] {
     });
   }
 
-  const fileNames = collectFileNames(result);
+  const fileNames = collectExecutableFileNames(result);
   if (fileNames.length > 0) {
     queries.push({
-      label: 'Nama File -- Windows Event Log',
-      description: `${fileNames.length} nama file di index=wineventlog`,
+      label: 'Nama File Executable -- Windows Event Log',
+      description: `${fileNames.length} file executable/script di index=wineventlog`,
       query: `index=wineventlog (${toOrList(fileNames)})`,
     });
   }

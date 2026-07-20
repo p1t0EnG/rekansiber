@@ -16,7 +16,6 @@ const teamLinks = [
   { href: '/bulk-checker', label: 'Bulk Checker', adminOnly: false },
   { href: '/phishing-reports', label: 'Phishing Report', adminOnly: false },
   { href: '/reports', label: 'Report', adminOnly: true },
-  { href: '/profile', label: 'Profile', adminOnly: false },
 ].filter((link) => !link.adminOnly || user?.role === 'admin');
 
 const currentPath = Astro.url.pathname;

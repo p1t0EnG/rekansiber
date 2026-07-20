@@ -39,7 +39,9 @@ const PageLayout = user ? AppLayout : Layout;
 
   <div id="result-providers" class="provider-grid"></div>
 
-  <style>
+  {/* is:global karena card provider dibuat dinamis (document.createElement) --
+      style scoped Astro tidak menempel ke elemen buatan script. */}
+  <style is:global>
     .input-row {
       display: flex;
       align-items: center;

@@ -57,7 +57,12 @@ if (!user) {
     </div>
   </div>
 
-  <style>
+  {/*
+    is:global karena sebagian besar elemen di bawah dibuat dinamis lewat
+    document.createElement -- style scoped Astro tidak menempel ke elemen itu
+    (inilah penyebab query Splunk sempat meluber keluar layout tanpa wrap).
+  */}
+  <style is:global>
     .result-head {
       display: flex;
       align-items: center;
