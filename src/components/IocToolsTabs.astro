@@ -1,0 +1,73 @@
+---
+import type { SessionUser } from '../server/auth/session';
+
+interface Props {
+  current: 'single' | 'bulk' | 'extractor';
+  user: SessionUser | null;
+}
+const { current, user } = Astro.props;
+
+// Satu menu "IOC Tools" dengan tiga mode. IOC Checker (satuan) publik; Bulk
+// Checker & IOC Extractor khusus tim -- kalau belum login, tab-nya terkunci
+// dan mengarah ke /login.
+const tabs = [
+  { key: 'single', label: 'IOC Checker', href: '/ioc-checker', teamOnly: false },
+  { key: 'bulk', label: 'Bulk Checker', href: '/bulk-checker', teamOnly: true },
+  { key: 'extractor', label: 'IOC Extractor', href: '/ioc-extractor', teamOnly: true },
+] as const;
+---
+
+<nav class="ioc-tabs" aria-label="Pilih mode IOC Tools">
+  {tabs.map((tab) => {
+    const locked = tab.teamOnly && !user;
+    return (
+      <a
+        href={locked ? '/login' : tab.href}
+        class:list={['ioc-tab', { active: tab.key === current, locked }]}
+        title={locked ? 'Khusus tim -- login dulu' : undefined}
+      >
+        <span>{tab.label}</span>
+        {locked && <span class="lock" aria-hidden="true">🔒</span>}
+      </a>
+    );
+  })}
+</nav>
+
+<style>
+  .ioc-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.3rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+  }
+  .ioc-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .ioc-tab:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+  .ioc-tab.active {
+    background: var(--brand);
+    color: #04121a;
+  }
+  .ioc-tab.locked {
+    opacity: 0.55;
+  }
+  .ioc-tab .lock {
+    font-size: 0.72rem;
+  }
+</style>

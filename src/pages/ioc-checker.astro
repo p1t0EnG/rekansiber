@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import AppLayout from '../layouts/AppLayout.astro';
+import IocToolsTabs from '../components/IocToolsTabs.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
@@ -11,8 +12,15 @@ const PageLayout = user ? AppLayout : Layout;
 
 <PageLayout title="IOC Checker" user={user}>
   <div class="page-header">
-    <h1>IOC Checker</h1>
-    <p>Masukkan IP, domain, hash, URL, atau alamat email.</p>
+    <h1>IOC Tools</h1>
+    <p>Cek reputasi IOC satu per satu, secara massal, atau ekstrak dari dokumen -- pilih mode di bawah.</p>
+  </div>
+
+  <IocToolsTabs current="single" user={user} />
+
+  <div class="page-header">
+    <h2 style="font-size:1.15rem;">Cek Satuan</h2>
+    <p>Masukkan satu IP, domain, hash, URL, atau alamat email.</p>
   </div>
 
   <div class="card">

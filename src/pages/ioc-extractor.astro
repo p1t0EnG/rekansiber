@@ -1,5 +1,6 @@
 ---
 import AppLayout from '../layouts/AppLayout.astro';
+import IocToolsTabs from '../components/IocToolsTabs.astro';
 import { getSessionUser } from '../server/auth/session';
 
 const db = Astro.locals.runtime.env.DB;
@@ -13,7 +14,14 @@ if (!user) {
 
 <AppLayout title="IOC Extractor" user={user}>
   <div class="page-header">
-    <h1>IOC Extractor</h1>
+    <h1>IOC Tools</h1>
+    <p>Cek reputasi IOC satu per satu, secara massal, atau ekstrak dari dokumen -- pilih mode di bawah.</p>
+  </div>
+
+  <IocToolsTabs current="extractor" user={user} />
+
+  <div class="page-header">
+    <h2 style="font-size:1.15rem;">IOC Extractor</h2>
     <p>
       Upload dokumen threat intel (.docx/.txt) -- semua IOC di dalamnya (hash, domain, IP, URL,
       email) diambil otomatis, di-refang, dan siap di-export. Dokumen diproses sepenuhnya di

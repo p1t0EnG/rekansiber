@@ -4,22 +4,25 @@ interface Props {
 }
 const { user = null } = Astro.props;
 
+const IOC_TOOLS_MATCH = ['/ioc-checker', '/bulk-checker', '/ioc-extractor'];
+
 const publicLinks = [
   { href: '/', label: 'Home' },
-  { href: '/ioc-checker', label: 'IOC Checker' },
+  { href: '/ioc-checker', label: 'IOC Tools', match: IOC_TOOLS_MATCH },
   { href: '/news', label: 'Berita' },
   { href: '/ransomware-watch', label: 'Ransomware Watch' },
 ];
 
 const teamLinks = [
   { href: '/dashboard', label: 'Dashboard', adminOnly: false },
-  { href: '/bulk-checker', label: 'Bulk Checker', adminOnly: false },
   { href: '/phishing-reports', label: 'Phishing Report', adminOnly: false },
   { href: '/reports', label: 'Report', adminOnly: true },
 ].filter((link) => !link.adminOnly || user?.role === 'admin');
 
 const currentPath = Astro.url.pathname;
 const isActive = (href: string) => (href === '/' ? currentPath === '/' : currentPath.startsWith(href));
+const linkActive = (link: { href: string; match?: string[] }) =>
+  link.match ? link.match.some((p) => currentPath.startsWith(p)) : isActive(link.href);
 ---
 
 <nav class="navbar">
@@ -39,7 +42,7 @@ const isActive = (href: string) => (href === '/' ? currentPath === '/' : current
     </a>
     <div class="links">
       {publicLinks.map((link) => (
-        <a href={link.href} class:list={{ active: isActive(link.href) }}>{link.label}</a>
+        <a href={link.href} class:list={{ active: linkActive(link) }}>{link.label}</a>
       ))}
       {user && (
         <>

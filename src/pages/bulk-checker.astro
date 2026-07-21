@@ -1,5 +1,6 @@
 ---
 import AppLayout from '../layouts/AppLayout.astro';
+import IocToolsTabs from '../components/IocToolsTabs.astro';
 import { getSessionUser } from '../server/auth/session';
 import { MAX_BULK_ITEMS } from '../server/ioc/types';
 
@@ -14,11 +15,36 @@ if (!user) {
 
 <AppLayout title="Bulk IOC Checker" user={user}>
   <div class="page-header">
-    <h1>Bulk IOC Checker</h1>
+    <h1>IOC Tools</h1>
+    <p>Cek reputasi IOC satu per satu, secara massal, atau ekstrak dari dokumen -- pilih mode di bawah.</p>
+  </div>
+
+  <IocToolsTabs current="bulk" user={user} />
+
+  <div class="page-header">
+    <h2 style="font-size:1.15rem;">Bulk Checker</h2>
     <p>
       Tempel atau upload daftar IOC (IP, domain, hash, URL, email) satu per baris -- type
-      dideteksi otomatis. Maksimal {MAX_BULK_ITEMS} IOC per batch.
+      dideteksi otomatis.
     </p>
+  </div>
+
+  <div class="callout" role="note">
+    <strong class="callout-title">Cara kerja Bulk Checker — dibaca dulu ya tim</strong>
+    <ul>
+      <li>
+        Maksimal <mark>{MAX_BULK_ITEMS} IOC per sekali cek</mark>. Kalau lebih, bagi jadi
+        beberapa kali submit.
+      </li>
+      <li>
+        IOC diproses <mark>bertahap, 5 per batch</mark> secara otomatis (biar tidak kena limit
+        server) — tunggu sampai progress di bawah tombol selesai, jangan tutup halaman.
+      </li>
+      <li>
+        Verdict <mark>"Unknown"</mark> = salah satu sumber (VirusTotal/OTX/dll) gagal diperiksa,
+        <strong>bukan berarti aman</strong>. Ulangi baris itu sebelum menyimpulkan.
+      </li>
+    </ul>
   </div>
 
   <div class="card">
@@ -50,6 +76,41 @@ if (!user) {
       <tbody id="bulk-results-body"></tbody>
     </table>
   </div>
+
+  <style>
+    .callout {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--brand);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.35rem;
+      margin-bottom: 1.5rem;
+    }
+    .callout-title {
+      display: block;
+      color: var(--brand-strong);
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+    .callout ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .callout li {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .callout mark {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--brand-strong);
+      padding: 0.05rem 0.35rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+  </style>
 
   <script>
     import { detectIocType } from '../server/ioc/validate';

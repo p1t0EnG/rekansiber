@@ -10,6 +10,16 @@ const role = user?.role ?? 'member';
 const currentPath = Astro.url.pathname;
 const isActive = (href: string) => (href === '/' ? currentPath === '/' : currentPath.startsWith(href));
 
+// Sebagian menu (mis. IOC Tools) mewakili beberapa route -- highlight kalau
+// currentPath cocok salah satu prefix di `match`.
+interface NavLink {
+  href: string;
+  label: string;
+  match?: string[];
+}
+const linkActive = (link: NavLink) =>
+  link.match ? link.match.some((p) => currentPath.startsWith(p)) : isActive(link.href);
+
 const icons: Record<string, string> = {
   dashboard: `<rect x="3" y="13" width="7" height="8" rx="1.5"/><rect x="14" y="8" width="7" height="13" rx="1.5"/><rect x="3" y="3" width="7" height="6" rx="1.5"/>`,
   bulk: `<line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/><path d="M18 4.3l1.4 1.4L22.5 3"/><path d="M18 10.3l1.4 1.4L22.5 9"/><path d="M18 16.3l1.4 1.4L22.5 15"/>`,
@@ -23,17 +33,17 @@ const icons: Record<string, string> = {
   news: `<path d="M4 4h13v15a2 2 0 002 2H6a2 2 0 01-2-2V4z"/><path d="M17 4h3v13a2 2 0 01-2 2"/><line x1="7" y1="8" x2="14" y2="8"/><line x1="7" y1="11.5" x2="14" y2="11.5"/><line x1="7" y1="15" x2="11" y2="15"/>`,
 };
 
+const IOC_TOOLS_MATCH = ['/ioc-checker', '/bulk-checker', '/ioc-extractor'];
+
 const teamLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', adminOnly: false },
-  { href: '/bulk-checker', label: 'Bulk Checker', icon: 'bulk', adminOnly: false },
-  { href: '/ioc-extractor', label: 'IOC Extractor', icon: 'extract', adminOnly: false },
+  { href: '/ioc-checker', label: 'IOC Tools', icon: 'search', adminOnly: false, match: IOC_TOOLS_MATCH },
   { href: '/phishing-reports', label: 'Phishing Report', icon: 'phishing', adminOnly: false },
   { href: '/reports', label: 'Report Bulanan', icon: 'report', adminOnly: true },
 ].filter((link) => !link.adminOnly || role === 'admin');
 
 const publicLinks = [
   { href: '/', label: 'Beranda', icon: 'home' },
-  { href: '/ioc-checker', label: 'IOC Checker', icon: 'search' },
   { href: '/news', label: 'Berita', icon: 'news' },
   { href: '/ransomware-watch', label: 'Ransomware Watch', icon: 'ransom' },
 ];
@@ -58,7 +68,7 @@ const initial = (user?.full_name ?? '?').trim().slice(0, 1).toUpperCase();
 
   <nav class="sidebar-nav">
     {teamLinks.map((link) => (
-      <a href={link.href} class="sidebar-link" class:list={{ active: isActive(link.href) }}>
+      <a href={link.href} class="sidebar-link" class:list={{ active: linkActive(link) }}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" set:html={icons[link.icon]} />
         <span>{link.label}</span>
       </a>
@@ -67,7 +77,7 @@ const initial = (user?.full_name ?? '?').trim().slice(0, 1).toUpperCase();
     <div class="sidebar-divider" role="separator"></div>
 
     {publicLinks.map((link) => (
-      <a href={link.href} class="sidebar-link" class:list={{ active: isActive(link.href) }}>
+      <a href={link.href} class="sidebar-link" class:list={{ active: linkActive(link) }}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" set:html={icons[link.icon]} />
         <span>{link.label}</span>
       </a>
