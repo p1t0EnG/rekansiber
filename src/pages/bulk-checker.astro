@@ -122,29 +122,71 @@ if (!user) {
         return;
       }
 
-      statusEl.textContent = `Memeriksa ${items.length} IOC...`;
+      // Dikirim per-chunk kecil, bukan sekaligus. Satu invocation Cloudflare
+      // Workers dibatasi ~50 subrequest; tiap IOC butuh 2-3 panggilan provider,
+      // jadi mengirim banyak IOC dalam satu request bikin sisa IOC gagal
+      // ("Gagal menghubungi VT/OTX") setelah limit tercapai. Dengan chunk 5,
+      // tiap request maksimal ~15 subrequest -- jauh di bawah batas.
+      const CHUNK_SIZE = 5;
+
       submitBtn.disabled = true;
       exportBtn.disabled = true;
+      lastResults = [];
+      tbody.innerHTML = '';
+      resultsCard.style.display = 'block';
 
+      let hadFailure = false;
       try {
-        const res = await fetch('/api/ioc/bulk-check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        });
+        for (let start = 0; start < items.length; start += CHUNK_SIZE) {
+          const chunk = items.slice(start, start + CHUNK_SIZE);
+          const from = start + 1;
+          const to = Math.min(start + chunk.length, items.length);
+          statusEl.textContent = `Memeriksa ${from}-${to} dari ${items.length} IOC...`;
 
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          statusEl.textContent = data.error ?? 'Gagal memeriksa IOC';
-          return;
+          try {
+            const res = await fetch('/api/ioc/bulk-check', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: chunk }),
+            });
+
+            if (!res.ok) {
+              const data = (await res.json().catch(() => ({}))) as { error?: string };
+              hadFailure = true;
+              for (const item of chunk) {
+                lastResults.push({
+                  value: item.value,
+                  type: item.type,
+                  verdict: 'unknown',
+                  error: data.error ?? `Gagal memeriksa (HTTP ${res.status})`,
+                  providers: [],
+                });
+              }
+            } else {
+              const data = (await res.json()) as { results: BulkResultItem[] };
+              lastResults.push(...data.results);
+            }
+          } catch {
+            // Kegagalan jaringan pada satu chunk tidak menghentikan chunk lain
+            hadFailure = true;
+            for (const item of chunk) {
+              lastResults.push({
+                value: item.value,
+                type: item.type,
+                verdict: 'unknown',
+                error: 'Gagal menghubungi server',
+                providers: [],
+              });
+            }
+          }
+
+          renderResults(lastResults);
         }
 
-        const data = (await res.json()) as { results: BulkResultItem[] };
-        lastResults = data.results;
-        renderResults(lastResults);
         statusEl.textContent =
           `Selesai: ${lastResults.length} IOC diperiksa` +
-          (skipped ? `, ${skipped} baris dilewati (format tidak dikenali)` : '');
+          (skipped ? `, ${skipped} baris dilewati (format tidak dikenali)` : '') +
+          (hadFailure ? '. Sebagian gagal diperiksa -- lihat kolom Detail, lalu ulangi baris tersebut.' : '');
         exportBtn.disabled = lastResults.length === 0;
       } finally {
         submitBtn.disabled = false;

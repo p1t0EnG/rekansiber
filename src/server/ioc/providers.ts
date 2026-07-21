@@ -29,13 +29,13 @@ export async function checkVirusTotal(value: string, type: IocType, apiKey: stri
       return { name: 'VirusTotal', verdict: 'clean', detail: 'Belum pernah dilaporkan (tidak ada data)' };
     }
     if (!res.ok) {
-      return { name: 'VirusTotal', verdict: 'unknown', detail: `API error (${res.status})` };
+      return { name: 'VirusTotal', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
     }
 
     const data = await res.json<any>();
     const stats = data?.data?.attributes?.last_analysis_stats;
     if (!stats) {
-      return { name: 'VirusTotal', verdict: 'unknown', detail: 'Data analisis tidak tersedia' };
+      return { name: 'VirusTotal', verdict: 'unknown', detail: 'Data analisis tidak tersedia', error: true };
     }
 
     const total = stats.malicious + stats.suspicious + stats.harmless + stats.undetected;
@@ -46,7 +46,7 @@ export async function checkVirusTotal(value: string, type: IocType, apiKey: stri
       detail: `${stats.malicious} malicious, ${stats.suspicious} suspicious dari ${total} engine`,
     };
   } catch {
-    return { name: 'VirusTotal', verdict: 'unknown', detail: 'Gagal menghubungi VirusTotal' };
+    return { name: 'VirusTotal', verdict: 'unknown', detail: 'Gagal menghubungi VirusTotal', error: true };
   }
 }
 
@@ -61,7 +61,7 @@ export async function checkAbuseIPDB(value: string, type: IocType, apiKey: strin
     );
 
     if (!res.ok) {
-      return { name: 'AbuseIPDB', verdict: 'unknown', detail: `API error (${res.status})` };
+      return { name: 'AbuseIPDB', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
     }
 
     const data = await res.json<any>();
@@ -74,7 +74,7 @@ export async function checkAbuseIPDB(value: string, type: IocType, apiKey: strin
       detail: `Skor abuse ${score}/100 dari ${totalReports} laporan`,
     };
   } catch {
-    return { name: 'AbuseIPDB', verdict: 'unknown', detail: 'Gagal menghubungi AbuseIPDB' };
+    return { name: 'AbuseIPDB', verdict: 'unknown', detail: 'Gagal menghubungi AbuseIPDB', error: true };
   }
 }
 
@@ -96,7 +96,7 @@ export async function checkOTX(value: string, type: IocType, apiKey: string): Pr
     });
 
     if (!res.ok) {
-      return { name: 'OTX', verdict: 'unknown', detail: `API error (${res.status})` };
+      return { name: 'OTX', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
     }
 
     const data = await res.json<any>();
@@ -115,7 +115,7 @@ export async function checkOTX(value: string, type: IocType, apiKey: string): Pr
       detail: `Muncul di ${count} threat pulse${topPulse ? ` -- pulse teratas: "${topPulse}"` : ''}`,
     };
   } catch {
-    return { name: 'OTX', verdict: 'unknown', detail: 'Gagal menghubungi OTX' };
+    return { name: 'OTX', verdict: 'unknown', detail: 'Gagal menghubungi OTX', error: true };
   }
 }
 
@@ -145,7 +145,7 @@ export async function checkMxToolbox(
     });
 
     if (!res.ok) {
-      return { name: 'MXToolbox', verdict: 'unknown', detail: `API error (${res.status})` };
+      return { name: 'MXToolbox', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
     }
 
     const data = await res.json<any>();
@@ -171,6 +171,6 @@ export async function checkMxToolbox(
         (listedNames ? ` (${listedNames})` : ''),
     };
   } catch {
-    return { name: 'MXToolbox', verdict: 'unknown', detail: 'Gagal menghubungi MXToolbox' };
+    return { name: 'MXToolbox', verdict: 'unknown', detail: 'Gagal menghubungi MXToolbox', error: true };
   }
 }
