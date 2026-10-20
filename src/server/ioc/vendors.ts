@@ -15,6 +15,13 @@ import type { IocType } from './types';
 export interface VendorLookup {
   id: string;
   name: string;
+  /**
+   * Merek induk. Mode massal menampilkan SATU KOLOM per merek, jadi beberapa
+   * entri yang semereknya (mis. Talos Reputation Center untuk IP/domain/URL dan
+   * Talos File Reputation untuk hash) berbagi kolom yang sama dan dipilih
+   * menurut tipe IOC barisnya.
+   */
+  brand: string;
   /** Apa yang bisa dicek di portal ini */
   checks: string;
   /** Tipe IOC yang didukung portal tsb */
@@ -39,6 +46,7 @@ export interface VendorLookup {
 const VENDORS: VendorLookup[] = [
   {
     id: 'talos-rep',
+    brand: 'Cisco Talos',
     name: 'Cisco Talos — Reputation Center',
     checks: 'Reputasi IP, domain, dan URL',
     supports: ['ip', 'domain', 'url'],
@@ -48,6 +56,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'talos-file',
+    brand: 'Cisco Talos',
     name: 'Cisco Talos — File Reputation',
     checks: 'Reputasi hash file',
     supports: ['hash'],
@@ -58,6 +67,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'symantec-sitereview',
+    brand: 'Symantec',
     name: 'Symantec Site Review (Broadcom)',
     checks: 'Kategori URL/domain di WebFilter',
     supports: ['domain', 'url'],
@@ -67,6 +77,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'pan-urlfiltering',
+    brand: 'Palo Alto',
     name: 'Palo Alto — Test A Site (PAN-DB)',
     checks: 'Kategori URL/domain di PAN-DB',
     supports: ['domain', 'url'],
@@ -76,6 +87,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'pan-threatvault',
+    brand: 'Palo Alto',
     name: 'Palo Alto — Threat Vault',
     checks: 'Signature antivirus untuk hash file, dan keanggotaan IP feed Threat Prevention',
     supports: ['hash', 'ip'],
@@ -86,6 +98,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'zscaler-sitereview',
+    brand: 'Zscaler',
     name: 'Zscaler — Site Review',
     checks: 'Kategori URL/domain di database filtering Zscaler',
     supports: ['domain', 'url'],
@@ -95,6 +108,7 @@ const VENDORS: VendorLookup[] = [
   },
   {
     id: 'zscaler-urlanalysis',
+    brand: 'Zscaler',
     name: 'Zscaler — URL Analysis (Zulu)',
     checks: 'Analisis risiko langsung terhadap isi halaman',
     supports: ['url'],
@@ -108,6 +122,25 @@ const VENDORS: VendorLookup[] = [
 
 export function vendorsFor(type: IocType): VendorLookup[] {
   return VENDORS.filter((v) => v.supports.includes(type));
+}
+
+/**
+ * Urutan kolom di mode massal. Palo Alto didahulukan karena cuma dia yang
+ * dijawab otomatis -- kolom yang paling berguna dibaca lebih dulu.
+ */
+export const VENDOR_BRANDS = ['Palo Alto', 'Cisco Talos', 'Zscaler', 'Symantec'] as const;
+
+/**
+ * Entri merek tertentu yang menangani satu IOC. Mengembalikan null kalau merek
+ * itu memang tidak punya portal untuk tipe tsb -- mis. Zscaler tidak melayani
+ * hash, jadi selnya dibiarkan kosong, bukan diisi tautan yang menyesatkan.
+ */
+export function vendorForBrand(brand: string, value: string, type: IocType): VendorLookup | null {
+  return (
+    VENDORS.find(
+      (v) => v.brand === brand && v.supports.includes(type) && (!v.accepts || v.accepts(value, type)),
+    ) ?? null
+  );
 }
 
 export const ALL_VENDORS = VENDORS;
