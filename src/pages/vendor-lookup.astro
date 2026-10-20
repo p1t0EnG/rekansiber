@@ -1,0 +1,220 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import IocToolsTabs from '../components/IocToolsTabs.astro';
+import { getSessionUser } from '../server/auth/session';
+
+const db = Astro.locals.runtime.env.DB;
+const token = Astro.cookies.get('session')?.value;
+const user = token ? await getSessionUser(db, token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<AppLayout title="Vendor Lookup" user={user}>
+  <div class="page-header">
+    <h1>IOC Tools</h1>
+    <p>Cek reputasi IOC satu per satu, secara massal, atau ekstrak dari dokumen -- pilih mode di bawah.</p>
+  </div>
+
+  <IocToolsTabs current="vendor" user={user} />
+
+  <div class="page-header">
+    <h2 style="font-size:1.15rem;">Vendor Lookup</h2>
+    <p>
+      Buka portal resmi vendor (Cisco Talos, Symantec Site Review, Palo Alto, Akamai) untuk satu
+      IOC tanpa perlu copy-paste ke banyak tab.
+    </p>
+  </div>
+
+  <div class="callout" role="note">
+    <strong class="callout-title">Kenapa ini membuka portal, bukan menampilkan hasil langsung</strong>
+    <ul>
+      <li>
+        <mark>Cisco Talos</mark> dan <mark>Symantec Site Review</mark> tidak menyediakan API publik,
+        dan kebijakan mereka melarang pengecekan otomatis. Jadi kita bantu berpindah cepat ke
+        portalnya, bukan mengambil datanya diam-diam.
+      </li>
+      <li>
+        <mark>Akamai</mark> hanya menyediakan lookup di dalam produk ETP / Secure Internet Access,
+        dan <mark>Palo Alto Threat Vault</mark> butuh langganan Threat Prevention/ATP.
+      </li>
+      <li>
+        Untuk verdict otomatis (VirusTotal, AbuseIPDB, OTX, MXToolbox), pakai tab
+        <strong>IOC Checker</strong> atau <strong>Bulk Checker</strong>.
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="vendor-value">IOC yang mau dicek</label>
+      <div class="input-row">
+        <input
+          id="vendor-value"
+          type="text"
+          placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f"
+          autocomplete="off"
+        />
+        <span id="vendor-type-badge" class="badge" style="display:none;"></span>
+      </div>
+      <p id="vendor-hint" class="hint" style="margin:0.5rem 0 0;"></p>
+    </div>
+  </div>
+
+  <div id="vendor-grid" class="vendor-grid"></div>
+
+  <style is:global>
+    .vendor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .vendor-card {
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .vendor-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .vendor-card-head strong {
+      font-size: 0.95rem;
+    }
+    .vendor-checks {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      margin: 0 0 0.5rem;
+    }
+    .vendor-note {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      margin: 0 0 1rem;
+      line-height: 1.5;
+    }
+    .vendor-card .btn {
+      align-self: flex-start;
+      margin-top: auto;
+    }
+  </style>
+
+  <script>
+    import { detectIocType } from '../server/ioc/validate';
+    import { vendorsFor } from '../server/ioc/vendors';
+
+    const input = document.getElementById('vendor-value') as HTMLInputElement;
+    const badge = document.getElementById('vendor-type-badge') as HTMLSpanElement;
+    const hint = document.getElementById('vendor-hint')!;
+    const grid = document.getElementById('vendor-grid')!;
+
+    const TYPE_LABEL: Record<string, string> = {
+      ip: 'IP Address',
+      domain: 'Domain',
+      hash: 'File Hash',
+      url: 'URL',
+      email: 'Email',
+    };
+
+    async function copyToClipboard(text: string): Promise<void> {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+
+    function render() {
+      const value = input.value.trim();
+      grid.innerHTML = '';
+
+      if (!value) {
+        badge.style.display = 'none';
+        hint.textContent = '';
+        return;
+      }
+
+      const type = detectIocType(value);
+      if (!type) {
+        badge.style.display = 'none';
+        hint.textContent = 'Format tidak dikenali. Masukkan IP, domain, hash, URL, atau alamat email.';
+        return;
+      }
+
+      badge.textContent = TYPE_LABEL[type];
+      badge.className = 'badge badge-unknown';
+      badge.style.display = 'inline-flex';
+
+      const vendors = vendorsFor(type);
+      if (vendors.length === 0) {
+        hint.textContent = `Belum ada portal vendor yang mendukung pengecekan ${TYPE_LABEL[type]} di daftar ini.`;
+        return;
+      }
+      hint.textContent = `${vendors.length} portal mendukung ${TYPE_LABEL[type]}.`;
+
+      for (const vendor of vendors) {
+        const card = document.createElement('div');
+        card.className = 'card vendor-card';
+
+        const head = document.createElement('div');
+        head.className = 'vendor-card-head';
+
+        const name = document.createElement('strong');
+        name.textContent = vendor.name;
+
+        const tag = document.createElement('span');
+        tag.className = vendor.autofill ? 'badge badge-clean' : 'badge badge-unknown';
+        tag.textContent = vendor.autofill ? 'Terisi otomatis' : 'Tempel manual';
+
+        head.appendChild(name);
+        head.appendChild(tag);
+
+        const checks = document.createElement('p');
+        checks.className = 'vendor-checks';
+        checks.textContent = vendor.checks;
+
+        card.appendChild(head);
+        card.appendChild(checks);
+
+        if (vendor.note) {
+          const note = document.createElement('p');
+          note.className = 'vendor-note';
+          note.textContent = vendor.note;
+          card.appendChild(note);
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-secondary';
+        btn.textContent = vendor.autofill ? 'Buka portal →' : 'Salin & buka portal →';
+        btn.addEventListener('click', () => {
+          // Jendela dibuka lebih dulu (masih dalam user gesture) supaya tidak
+          // diblokir popup blocker, baru nilainya disalin.
+          window.open(vendor.buildUrl(value), '_blank', 'noopener');
+          if (!vendor.autofill) {
+            void copyToClipboard(value);
+            btn.textContent = 'Tersalin — tinggal tempel';
+            setTimeout(() => (btn.textContent = 'Salin & buka portal →'), 2000);
+          }
+        });
+
+        card.appendChild(btn);
+        grid.appendChild(card);
+      }
+    }
+
+    input.addEventListener('input', render);
+  </script>
+</AppLayout>

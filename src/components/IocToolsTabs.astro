@@ -2,18 +2,19 @@
 import type { SessionUser } from '../server/auth/session';
 
 interface Props {
-  current: 'single' | 'bulk' | 'extractor';
+  current: 'single' | 'bulk' | 'extractor' | 'vendor';
   user: SessionUser | null;
 }
 const { current, user } = Astro.props;
 
-// Satu menu "IOC Tools" dengan tiga mode. IOC Checker (satuan) publik; Bulk
-// Checker & IOC Extractor khusus tim -- kalau belum login, tab-nya terkunci
-// dan mengarah ke /login.
+// Satu menu "IOC Tools" dengan empat mode. IOC Checker (satuan) publik; Bulk
+// Checker, IOC Extractor & Vendor Lookup khusus tim -- kalau belum login,
+// tab-nya terkunci dan mengarah ke /login.
 const tabs = [
   { key: 'single', label: 'IOC Checker', href: '/ioc-checker', teamOnly: false },
   { key: 'bulk', label: 'Bulk Checker', href: '/bulk-checker', teamOnly: true },
   { key: 'extractor', label: 'IOC Extractor', href: '/ioc-extractor', teamOnly: true },
+  { key: 'vendor', label: 'Vendor Lookup', href: '/vendor-lookup', teamOnly: true },
 ] as const;
 ---
 
