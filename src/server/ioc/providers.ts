@@ -175,104 +175,151 @@ export async function checkMxToolbox(
   }
 }
 
-// Palo Alto Threat Vault: cek apakah hash file punya signature antivirus di PAN-DB.
-// Hanya untuk hash, dan hanya MD5/SHA-256 (SHA-1 tidak didukung API-nya -> return null
-// supaya kartunya tidak muncul). Butuh langganan Threat Prevention/ATP yang aktif;
-// tanpa API key, hasilnya ditandai "belum dikonfigurasi" (bukan error provider).
-const THREAT_VAULT_URL = 'https://api.threatvault.paloaltonetworks.com/service/v1/threats';
+// Palo Alto Threat Vault. Dua jenis lookup yang dipakai di sini:
+//   - hash file (MD5/SHA-256) -> /threats, metadata signature antivirus + verdict WildFire
+//   - alamat IP               -> /ip-feed, keanggotaan di IP feed Threat Prevention
+// SHA-1 serta domain/URL tidak didukung API-nya -> return null supaya kartunya
+// tidak muncul sama sekali, bukan muncul kosong. Butuh langganan Threat
+// Prevention/ATP aktif; tanpa API key hasilnya ditandai "belum dikonfigurasi"
+// (bukan error provider).
+const THREAT_VAULT_BASE = 'https://api.threatvault.paloaltonetworks.com/service/v1';
+const TV_NAME = 'Threat Vault';
 
 export async function checkThreatVault(
   value: string,
   type: IocType,
   apiKey: string | undefined,
 ): Promise<ProviderResult | null> {
-  if (type !== 'hash') return null;
+  if (type !== 'hash' && type !== 'ip') return null;
 
-  // 32 hex = MD5, 64 hex = SHA-256. SHA-1 (40) tidak didukung.
-  const param = value.length === 32 ? 'md5' : value.length === 64 ? 'sha256' : null;
-  if (!param) return null;
+  // 32 hex = MD5, 64 hex = SHA-256. SHA-1 (40) tidak didukung endpoint /threats.
+  const hashParam = value.length === 32 ? 'md5' : value.length === 64 ? 'sha256' : null;
+  if (type === 'hash' && !hashParam) return null;
 
   if (!apiKey) {
     return {
-      name: 'Threat Vault',
+      name: TV_NAME,
       verdict: 'unknown',
       detail: 'API key Threat Vault belum dikonfigurasi (set THREATVAULT_API_KEY)',
     };
   }
 
-  try {
-    const res = await fetch(`${THREAT_VAULT_URL}?${param}=${encodeURIComponent(value)}`, {
-      headers: { 'X-API-KEY': apiKey, Accept: 'application/json' },
-    });
+  const url =
+    type === 'hash'
+      ? `${THREAT_VAULT_BASE}/threats?${hashParam}=${encodeURIComponent(value)}`
+      : `${THREAT_VAULT_BASE}/ip-feed?ipaddr=${encodeURIComponent(value)}`;
 
-    // Tidak ada signature yang cocok -- wajar, bukan kegagalan.
-    if (res.status === 404) {
-      return { name: 'Threat Vault', verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
+  try {
+    const res = await fetch(url, { headers: { 'X-API-KEY': apiKey, Accept: 'application/json' } });
+
+    // Hash tanpa signature dijawab 404 -- wajar, bukan kegagalan. Endpoint
+    // /ip-feed tidak pernah 404: IP yang bersih tetap 200 dengan name: null.
+    if (res.status === 404 && type === 'hash') {
+      return { name: TV_NAME, verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
     }
     if (res.status === 401 || res.status === 403) {
       return {
-        name: 'Threat Vault',
+        name: TV_NAME,
         verdict: 'unknown',
         detail: `API key ditolak (${res.status}) -- cek key dan status langganan`,
         error: true,
       };
     }
     if (!res.ok) {
-      return { name: 'Threat Vault', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
+      return { name: TV_NAME, verdict: 'unknown', detail: `API error (${res.status})`, error: true };
     }
 
     const data = await res.json<any>();
 
-    // Bentuk respons nyata (diverifikasi langsung ke API):
-    //   { success, count, data: { fileinfo: [ { type, family, platform, wildfire_verdict,
-    //     signatures: { antivirus: [ { name, severity } ] } } ] } }
-    // FAIL-SAFE: hanya simpulkan "clean" kalau responsnya memang BERBENTUK hasil kosong
-    // yang kita kenali. Struktur tak dikenali -> unknown, jangan tebak clean, supaya
-    // hash berbahaya tidak pernah lolos dianggap aman.
+    // FAIL-SAFE: hanya simpulkan sesuatu kalau responsnya memang BERBENTUK hasil
+    // yang kita kenali. Struktur tak dikenali -> unknown, jangan tebak clean,
+    // supaya IOC berbahaya tidak pernah lolos dianggap aman.
     if (!data || typeof data !== 'object' || data.success !== true) {
       return {
-        name: 'Threat Vault',
+        name: TV_NAME,
         verdict: 'unknown',
         detail: 'Format respons Threat Vault tidak dikenali -- cek manual di portal',
         error: true,
       };
     }
 
-    const files: any[] = Array.isArray(data?.data?.fileinfo) ? data.data.fileinfo : [];
-    if (files.length === 0) {
-      return { name: 'Threat Vault', verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
-    }
-
-    const file = files[0] ?? {};
-    const wildfire = typeof file.wildfire_verdict === 'string' ? file.wildfire_verdict.toLowerCase() : '';
-    const avSignatures: any[] = Array.isArray(file?.signatures?.antivirus) ? file.signatures.antivirus : [];
-
-    // wildfire_verdict adalah penilaian resmi Palo Alto; kalau tidak ada, adanya
-    // signature antivirus sendiri sudah menandakan file dikenali berbahaya.
-    const verdict: Verdict =
-      wildfire === 'malicious' || wildfire === 'phishing'
-        ? 'malicious'
-        : wildfire === 'grayware'
-          ? 'suspicious'
-          : wildfire === 'benign'
-            ? 'clean'
-            : avSignatures.length > 0
-              ? 'malicious'
-              : 'unknown';
-
-    const descriptor = [file.type, file.family].filter((x) => typeof x === 'string' && x.trim()).join('/');
-    const sigName = typeof avSignatures[0]?.name === 'string' ? avSignatures[0].name : '';
-    const detail = [
-      descriptor || 'Sampel dikenali',
-      file.platform ? `(${file.platform})` : '',
-      wildfire ? `-- WildFire: ${wildfire}` : '',
-      avSignatures.length ? `-- ${avSignatures.length} signature AV${sigName ? `: ${sigName}` : ''}` : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-
-    return { name: 'Threat Vault', verdict, detail };
+    return type === 'hash' ? readHashResult(data) : readIpFeedResult(data);
   } catch {
-    return { name: 'Threat Vault', verdict: 'unknown', detail: 'Gagal menghubungi Threat Vault', error: true };
+    return { name: TV_NAME, verdict: 'unknown', detail: 'Gagal menghubungi Threat Vault', error: true };
   }
+}
+
+// Bentuk respons /threats (diverifikasi langsung ke API):
+//   { success, count, data: { fileinfo: [ { type, family, platform, wildfire_verdict,
+//     signatures: { antivirus: [ { name, severity } ] } } ] } }
+function readHashResult(data: any): ProviderResult {
+  const files: any[] = Array.isArray(data?.data?.fileinfo) ? data.data.fileinfo : [];
+  if (files.length === 0) {
+    return { name: TV_NAME, verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
+  }
+
+  const file = files[0] ?? {};
+  const wildfire = typeof file.wildfire_verdict === 'string' ? file.wildfire_verdict.toLowerCase() : '';
+  const avSignatures: any[] = Array.isArray(file?.signatures?.antivirus) ? file.signatures.antivirus : [];
+
+  // wildfire_verdict adalah penilaian resmi Palo Alto; kalau tidak ada, adanya
+  // signature antivirus sendiri sudah menandakan file dikenali berbahaya.
+  const verdict: Verdict =
+    wildfire === 'malicious' || wildfire === 'phishing'
+      ? 'malicious'
+      : wildfire === 'grayware'
+        ? 'suspicious'
+        : wildfire === 'benign'
+          ? 'clean'
+          : avSignatures.length > 0
+            ? 'malicious'
+            : 'unknown';
+
+  const descriptor = [file.type, file.family].filter((x) => typeof x === 'string' && x.trim()).join('/');
+  const sigName = typeof avSignatures[0]?.name === 'string' ? avSignatures[0].name : '';
+  const detail = [
+    descriptor || 'Sampel dikenali',
+    file.platform ? `(${file.platform})` : '',
+    wildfire ? `-- WildFire: ${wildfire}` : '',
+    avSignatures.length ? `-- ${avSignatures.length} signature AV${sigName ? `: ${sigName}` : ''}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return { name: TV_NAME, verdict, detail };
+}
+
+// Bentuk respons /ip-feed (diverifikasi langsung ke API):
+//   { success, count, data: [ { ipaddr, name, status, release, geo, asn } ] }
+// `name` = nama IP feed Threat Prevention yang memuat IP ini, atau null kalau
+// tidak terdaftar (status "N/A"). geo/asn selalu terisi dan tetap berguna
+// sebagai konteks walau IP-nya bersih.
+function readIpFeedResult(data: any): ProviderResult {
+  const rows: any[] = Array.isArray(data?.data) ? data.data : [];
+  if (rows.length === 0) {
+    return { name: TV_NAME, verdict: 'unknown', detail: 'Tidak ada data IP feed untuk alamat ini' };
+  }
+
+  const row = rows[0] ?? {};
+  const feed = typeof row.name === 'string' && row.name.trim() ? row.name.trim() : '';
+  const context = [row.geo, row.asn].filter((x) => typeof x === 'string' && x.trim()).join(' -- ');
+
+  if (!feed) {
+    return {
+      name: TV_NAME,
+      verdict: 'clean',
+      detail: ['Tidak terdaftar di IP feed Threat Prevention', context].filter(Boolean).join(' -- '),
+    };
+  }
+
+  // "Known malicious" = sudah terbukti jahat. "High risk" / "Bulletproof hosting"
+  // = lingkungan berisiko -- belum tentu IP-nya sendiri sedang menyerang, jadi
+  // ditandai suspicious supaya analyst tetap memeriksa, bukan langsung memblokir.
+  const verdict: Verdict = feed.toLowerCase().includes('malicious') ? 'malicious' : 'suspicious';
+
+  return {
+    name: TV_NAME,
+    verdict,
+    detail: [`Terdaftar di "${feed}"`, context].filter(Boolean).join(' -- '),
+  };
 }

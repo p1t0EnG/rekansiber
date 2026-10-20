@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { isValidIoc } from './ioc/validate';
 import { checkIoc } from './ioc/check';
+import { checkThreatVault } from './ioc/providers';
 import { checkRateLimit } from './ioc/rate-limit';
 import { MAX_BULK_ITEMS, type IocType } from './ioc/types';
 import { hashPassword, verifyPassword } from './auth/password';
@@ -144,6 +145,29 @@ app.post('/ioc/bulk-check', requireAuth, async (c) => {
   );
 
   return c.json({ results });
+});
+
+// --- Vendor Lookup: hasil langsung dari API vendor (tim SOC, butuh login) ---
+// Sengaja TIDAK memanggil provider lain dan TIDAK menulis ke ioc_checks: halaman
+// Vendor Lookup adalah alat bantu pivot, bukan pencatat riwayat pemeriksaan.
+// Satu-satunya vendor di halaman itu yang punya API terbuka adalah Threat Vault.
+app.get('/vendor/threat-vault', requireAuth, async (c) => {
+  const value = c.req.query('value')?.trim() ?? '';
+  const type = c.req.query('type') as IocType | undefined;
+
+  if (!value || !type || !VALID_TYPES.includes(type)) {
+    return c.json({ error: 'value dan type wajib diisi' }, 400);
+  }
+  if (!isValidIoc(value, type)) {
+    return c.json({ error: `Format value tidak valid untuk type ${type}` }, 400);
+  }
+
+  const result = await checkThreatVault(value, type, c.env.THREATVAULT_API_KEY);
+  if (!result) {
+    return c.json({ error: `Threat Vault tidak mendukung type ${type}` }, 400);
+  }
+
+  return c.json({ result });
 });
 
 // --- Berita CVE & Ransomware (dibaca dari cache KV, diisi oleh worker terpisah news-cron/) ---

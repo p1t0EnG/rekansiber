@@ -1,14 +1,13 @@
 import type { IocType } from './types';
 
-// Pivot lookup ke portal vendor. Ini SENGAJA bukan integrasi API:
+// Daftar vendor di halaman Vendor Lookup. Sebagian besar hanya PIVOT ke portal
+// resmi vendor, bukan integrasi API -- itu batasan lisensi, bukan teknis:
 //  - Cisco Talos tidak punya API reputasi publik, dan ToS-nya melarang scraping.
 //  - Symantec Site Review tidak punya API publik (dikonfirmasi KB Broadcom 175706),
 //    dan penggunaan otomatis melanggar acceptable use policy mereka.
 //  - Akamai hanya menyediakan lookup IOC di dalam produk ETP / Secure Internet Access.
-//  - Palo Alto Threat Vault punya API, tapi butuh langganan Threat Prevention/ATP
-//    dan cakupannya hash + CVE (bukan IP/domain/URL).
-// Jadi di sini kita bantu analyst berpindah cepat ke portal resminya, bukan
-// mengotomatiskan pengambilan datanya.
+// Satu-satunya yang punya API terbuka adalah Palo Alto Threat Vault (`liveApi`),
+// untuk hash file dan alamat IP -- hasilnya ditampilkan langsung di kartunya.
 
 export interface VendorLookup {
   id: string;
@@ -19,6 +18,8 @@ export interface VendorLookup {
   supports: IocType[];
   /** true = nilai sudah terisi otomatis lewat URL; false = perlu ditempel manual */
   autofill: boolean;
+  /** true = hasilnya diambil langsung lewat API dan ditampilkan di kartu */
+  liveApi?: boolean;
   /** Catatan penting (mis. butuh akun / batasan kebijakan) */
   note?: string;
   /** Halaman lookup. value sudah di-encode saat autofill. */
@@ -65,10 +66,11 @@ const VENDORS: VendorLookup[] = [
   {
     id: 'pan-threatvault',
     name: 'Palo Alto — Threat Vault',
-    checks: 'Metadata signature untuk hash file',
-    supports: ['hash'],
+    checks: 'Signature antivirus untuk hash file, dan keanggotaan IP feed Threat Prevention',
+    supports: ['hash', 'ip'],
     autofill: false,
-    note: 'Butuh akun Palo Alto dengan langganan Threat Prevention/ATP aktif.',
+    liveApi: true,
+    note: 'Hasil di bawah diambil langsung lewat API. Buka portal untuk detail signature lengkap, riwayat rilis, dan CVE terkait.',
     buildUrl: () => 'https://threatvault.paloaltonetworks.com/',
   },
   {

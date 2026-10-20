@@ -23,26 +23,28 @@ if (!user) {
   <div class="page-header">
     <h2 style="font-size:1.15rem;">Vendor Lookup</h2>
     <p>
-      Buka portal resmi vendor (Cisco Talos, Symantec Site Review, Palo Alto, Akamai) untuk satu
-      IOC tanpa perlu copy-paste ke banyak tab.
+      Cek satu IOC ke vendor-vendor spesifik: Palo Alto Threat Vault tampil langsung di sini,
+      sisanya dibukakan ke portal resminya tanpa perlu copy-paste ke banyak tab.
     </p>
   </div>
 
   <div class="callout" role="note">
-    <strong class="callout-title">Kenapa ini membuka portal, bukan menampilkan hasil langsung</strong>
+    <strong class="callout-title">Mana yang otomatis, mana yang dibuka manual</strong>
     <ul>
       <li>
+        <mark>Palo Alto Threat Vault</mark> punya API terbuka, jadi hasilnya langsung tampil di
+        kartunya -- untuk <strong>hash file</strong> (signature antivirus + verdict WildFire) dan
+        <strong>alamat IP</strong> (keanggotaan IP feed Threat Prevention).
+      </li>
+      <li>
         <mark>Cisco Talos</mark> dan <mark>Symantec Site Review</mark> tidak menyediakan API publik,
-        dan kebijakan mereka melarang pengecekan otomatis. Jadi kita bantu berpindah cepat ke
-        portalnya, bukan mengambil datanya diam-diam.
+        dan kebijakan mereka melarang pengecekan otomatis. <mark>Akamai</mark> hanya menyediakan
+        lookup di dalam produk ETP / Secure Internet Access. Untuk ketiganya kita bantu berpindah
+        cepat ke portal resminya, bukan mengambil datanya diam-diam.
       </li>
       <li>
-        <mark>Akamai</mark> hanya menyediakan lookup di dalam produk ETP / Secure Internet Access,
-        dan <mark>Palo Alto Threat Vault</mark> butuh langganan Threat Prevention/ATP.
-      </li>
-      <li>
-        Untuk verdict otomatis (VirusTotal, AbuseIPDB, OTX, MXToolbox), pakai tab
-        <strong>IOC Checker</strong> atau <strong>Bulk Checker</strong>.
+        Untuk verdict gabungan beberapa sumber sekaligus, pakai tab <strong>IOC Checker</strong>
+        atau <strong>Bulk Checker</strong>.
       </li>
     </ul>
   </div>
@@ -102,6 +104,30 @@ if (!user) {
       align-self: flex-start;
       margin-top: auto;
     }
+    .vendor-result {
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+      margin: 0 0 1rem;
+    }
+    .vendor-result-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .vendor-result-detail {
+      color: var(--text);
+      font-size: 0.85rem;
+      line-height: 1.55;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    .vendor-result-waiting {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0;
+    }
   </style>
 
   <script>
@@ -136,7 +162,73 @@ if (!user) {
       }
     }
 
+    const VERDICT_LABEL: Record<string, string> = {
+      clean: 'Bersih',
+      suspicious: 'Mencurigakan',
+      malicious: 'Berbahaya',
+      unknown: 'Tidak diketahui',
+    };
+
+    // Input berubah tiap ketikan, jadi panggilan API ditunda sampai user berhenti
+    // mengetik. `liveSeq` membuang hasil yang datang terlambat setelah nilainya
+    // sudah berganti -- tanpa itu, jawaban lama bisa menimpa jawaban baru.
+    let liveTimer: number | undefined;
+    let liveSeq = 0;
+
+    async function runLiveLookup(box: HTMLElement, value: string, type: string, seq: number) {
+      try {
+        const res = await fetch(
+          `/api/vendor/threat-vault?value=${encodeURIComponent(value)}&type=${encodeURIComponent(type)}`,
+        );
+        if (seq !== liveSeq) return;
+
+        const data = (await res.json()) as { result?: { verdict: string; detail: string }; error?: string };
+        if (seq !== liveSeq) return;
+
+        if (!res.ok || !data.result) {
+          box.innerHTML = '';
+          const err = document.createElement('p');
+          err.className = 'vendor-result-waiting';
+          err.textContent = data.error ?? `Gagal mengambil hasil (HTTP ${res.status}).`;
+          box.appendChild(err);
+          return;
+        }
+
+        const { verdict, detail } = data.result;
+        box.innerHTML = '';
+
+        const head = document.createElement('div');
+        head.className = 'vendor-result-head';
+
+        const vb = document.createElement('span');
+        vb.className = `badge badge-${verdict}`;
+        vb.textContent = VERDICT_LABEL[verdict] ?? verdict;
+        head.appendChild(vb);
+
+        const detailEl = document.createElement('p');
+        detailEl.className = 'vendor-result-detail';
+        detailEl.textContent = detail;
+
+        box.appendChild(head);
+        box.appendChild(detailEl);
+      } catch {
+        if (seq !== liveSeq) return;
+        box.innerHTML = '';
+        const err = document.createElement('p');
+        err.className = 'vendor-result-waiting';
+        err.textContent = 'Gagal menghubungi API vendor.';
+        box.appendChild(err);
+      }
+    }
+
     function render() {
+      // Batalkan lookup yang masih menunggu -- nilainya sudah tidak relevan.
+      if (liveTimer) {
+        clearTimeout(liveTimer);
+        liveTimer = undefined;
+      }
+      liveSeq++;
+
       const value = input.value.trim();
       grid.innerHTML = '';
 
@@ -159,10 +251,12 @@ if (!user) {
 
       const vendors = vendorsFor(type);
       if (vendors.length === 0) {
-        hint.textContent = `Belum ada portal vendor yang mendukung pengecekan ${TYPE_LABEL[type]} di daftar ini.`;
+        hint.textContent = `Belum ada vendor di daftar ini yang mendukung pengecekan ${TYPE_LABEL[type]}.`;
         return;
       }
-      hint.textContent = `${vendors.length} portal mendukung ${TYPE_LABEL[type]}.`;
+      hint.textContent = `${vendors.length} vendor mendukung ${TYPE_LABEL[type]}.`;
+
+      const liveBoxes: HTMLElement[] = [];
 
       for (const vendor of vendors) {
         const card = document.createElement('div');
@@ -175,8 +269,13 @@ if (!user) {
         name.textContent = vendor.name;
 
         const tag = document.createElement('span');
-        tag.className = vendor.autofill ? 'badge badge-clean' : 'badge badge-unknown';
-        tag.textContent = vendor.autofill ? 'Terisi otomatis' : 'Tempel manual';
+        if (vendor.liveApi) {
+          tag.className = 'badge badge-clean';
+          tag.textContent = 'Hasil langsung';
+        } else {
+          tag.className = vendor.autofill ? 'badge badge-clean' : 'badge badge-unknown';
+          tag.textContent = vendor.autofill ? 'Terisi otomatis' : 'Tempel manual';
+        }
 
         head.appendChild(name);
         head.appendChild(tag);
@@ -195,10 +294,22 @@ if (!user) {
           card.appendChild(note);
         }
 
+        if (vendor.liveApi) {
+          const box = document.createElement('div');
+          box.className = 'vendor-result';
+          const waiting = document.createElement('p');
+          waiting.className = 'vendor-result-waiting';
+          waiting.textContent = 'Memeriksa ke API vendor...';
+          box.appendChild(waiting);
+          card.appendChild(box);
+          liveBoxes.push(box);
+        }
+
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-secondary';
-        btn.textContent = vendor.autofill ? 'Buka portal →' : 'Salin & buka portal →';
+        const btnLabel = vendor.autofill ? 'Buka portal →' : 'Salin & buka portal →';
+        btn.textContent = btnLabel;
         btn.addEventListener('click', () => {
           // Jendela dibuka lebih dulu (masih dalam user gesture) supaya tidak
           // diblokir popup blocker, baru nilainya disalin.
@@ -206,12 +317,19 @@ if (!user) {
           if (!vendor.autofill) {
             void copyToClipboard(value);
             btn.textContent = 'Tersalin — tinggal tempel';
-            setTimeout(() => (btn.textContent = 'Salin & buka portal →'), 2000);
+            setTimeout(() => (btn.textContent = btnLabel), 2000);
           }
         });
 
         card.appendChild(btn);
         grid.appendChild(card);
+      }
+
+      if (liveBoxes.length > 0) {
+        const seq = liveSeq;
+        liveTimer = window.setTimeout(() => {
+          for (const box of liveBoxes) void runLiveLookup(box, value, type, seq);
+        }, 500);
       }
     }
 
