@@ -87,20 +87,22 @@ const VENDORS: VendorLookup[] = [
   {
     id: 'zscaler-sitereview',
     name: 'Zscaler — Site Review',
-    checks: 'Kategori URL/domain di cloud Zscaler',
+    checks: 'Kategori URL/domain di database filtering Zscaler',
     supports: ['domain', 'url'],
     autofill: false,
-    note: 'Lookup publik, satu per satu. Pengecekan massal lewat API butuh tenant ZIA (endpoint urlLookup, maks 100 URL sekali panggil).',
+    note: 'Lookup DATABASE -- menunjukkan kategori yang sudah Zscaler tetapkan (mis. Phishing, Malicious Content). Cepat, dan inilah yang dipakai gateway Zscaler untuk memblokir. Pakai ini lebih dulu.',
     buildUrl: () => 'https://sitereview.zscaler.com/',
   },
   {
-    id: 'zscaler-zulu',
-    name: 'Zscaler — Zulu URL Risk Analyzer',
-    checks: 'Skor risiko konten dan reputasi satu URL',
+    id: 'zscaler-urlanalysis',
+    name: 'Zscaler — URL Analysis (Zulu)',
+    checks: 'Analisis risiko langsung terhadap isi halaman',
     supports: ['url'],
     autofill: false,
-    note: 'Menganalisis isi halaman dan reputasinya, lalu memberi skor risiko.',
-    buildUrl: () => 'https://zulu.zscaler.com/',
+    // Rumah Zulu yang masih dirawat ada di ThreatLabz; domain lama
+    // zulu.zscaler.com masih hidup tapi footer-nya berhenti di 2024.
+    note: 'Analisis LANGSUNG -- halamannya benar-benar dibuka dan diperiksa saat itu juga (isi halaman, pola URL, reputasi IP/DNS), lalu diberi skor 0-100 dan verdict Benign/Suspicious/Malicious. Pakai ini kalau Site Review bilang belum terkategori tapi kamu masih curiga, mis. URL phishing yang baru dibuat. Lebih lambat, bisa 20 detik lebih.',
+    buildUrl: () => 'https://threatlabz.zscaler.com/tool/url-analysis',
   },
 ];
 
