@@ -249,6 +249,17 @@ if (!user) {
       color: var(--text-muted);
       text-align: center;
     }
+    /* SHA-256 sepanjang 64 karakter memaksa kolom IOC melebar dan mendorong
+       kolom vendor keluar layar -- dipatahkan supaya tetap terbaca. */
+    .cell-ioc {
+      max-width: 240px;
+      overflow-wrap: anywhere;
+      font-size: 0.82rem;
+    }
+    .cell-type {
+      white-space: nowrap;
+      font-size: 0.82rem;
+    }
     .cell-link {
       display: inline-block;
       font-size: 0.8rem;
@@ -584,9 +595,10 @@ if (!user) {
 
     bulkInput.addEventListener('input', updateBulkHint);
 
-    function cellText(text: string): HTMLTableCellElement {
+    function cellText(text: string, className?: string): HTMLTableCellElement {
       const td = document.createElement('td');
       td.textContent = text;
+      if (className) td.className = className;
       return td;
     }
 
@@ -659,8 +671,8 @@ if (!user) {
 
       for (const r of rows) {
         const tr = document.createElement('tr');
-        tr.appendChild(cellText(r.value));
-        tr.appendChild(cellText(TYPE_LABEL[r.type] ?? r.type));
+        tr.appendChild(cellText(r.value, 'cell-ioc'));
+        tr.appendChild(cellText(TYPE_LABEL[r.type] ?? r.type, 'cell-type'));
         for (const brand of VENDOR_BRANDS) tr.appendChild(brandCell(brand, r));
         bulkBody.appendChild(tr);
 
