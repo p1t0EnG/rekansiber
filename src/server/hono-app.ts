@@ -31,6 +31,7 @@ type Bindings = {
   MXTOOLBOX_API_KEY?: string;
   THREATVAULT_API_KEY?: string;
   SESSION_SECRET: string;
+  APP_ENV?: string;
 };
 
 type Variables = { user: SessionUser };
@@ -42,6 +43,33 @@ const VALID_TYPES: IocType[] = ['ip', 'domain', 'hash', 'url', 'email'];
 
 // --- Health check, buat mastiin deploy berhasil ---
 app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString() }));
+
+// --- Diagnostik binding API key (khusus admin) ---
+// Melaporkan ADA/TIDAK-nya tiap key, TIDAK PERNAH nilainya. Gunanya: memastikan
+// secret yang dipasang di dashboard Cloudflare benar-benar sampai ke Worker setelah
+// deploy. `string_bindings_present` cuma NAMA binding bertipe string yang ada di
+// runtime -- itu yang membedakan "secret belum tersimpan" dari "tersimpan tapi
+// namanya salah tulis", dua hal yang di UI sama-sama muncul sebagai provider
+// "belum dikonfigurasi" tanpa petunjuk apa pun.
+app.get('/health/providers', requireAuth, requireRole('admin'), (c) => {
+  const filled = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
+  const env = c.env as unknown as Record<string, unknown>;
+
+  return c.json({
+    app_env: c.env.APP_ENV ?? null,
+    expected: {
+      VT_API_KEY: filled(c.env.VT_API_KEY),
+      ABUSEIPDB_API_KEY: filled(c.env.ABUSEIPDB_API_KEY),
+      OTX_API_KEY: filled(c.env.OTX_API_KEY),
+      MXTOOLBOX_API_KEY: filled(c.env.MXTOOLBOX_API_KEY),
+      THREATVAULT_API_KEY: filled(c.env.THREATVAULT_API_KEY),
+      SESSION_SECRET: filled(c.env.SESSION_SECRET),
+    },
+    string_bindings_present: Object.keys(env)
+      .filter((k) => typeof env[k] === 'string')
+      .sort(),
+  });
+});
 
 // --- IOC Checker (publik, tanpa login) ---
 app.post('/ioc/check', async (c) => {
