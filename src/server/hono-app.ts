@@ -2,7 +2,13 @@ import { Hono, type Context } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { isValidIoc } from './ioc/validate';
 import { checkIoc } from './ioc/check';
-import { checkThreatVault } from './ioc/providers';
+import {
+  checkThreatVault,
+  checkThreatVaultBulk,
+  checkThreatVaultCve,
+  CVE_PATTERN,
+  type BulkInput,
+} from './ioc/threat-vault';
 import { checkRateLimit } from './ioc/rate-limit';
 import { MAX_BULK_ITEMS, type IocType } from './ioc/types';
 import { hashPassword, verifyPassword } from './auth/password';
@@ -168,6 +174,42 @@ app.get('/vendor/threat-vault', requireAuth, async (c) => {
   }
 
   return c.json({ result });
+});
+
+// Mode "banyak IOC" di Vendor Lookup. Memakai endpoint BATCH Threat Vault
+// (maksimal 100 entri per panggilan), jadi 200 IOC cuma butuh beberapa panggilan
+// API -- bukan 200. Itu yang membuat mode ini tidak menghabiskan kuota harian.
+app.post('/vendor/threat-vault/bulk', requireAuth, async (c) => {
+  const body = await c.req.json<{ items: BulkInput[] }>().catch(() => null);
+
+  if (!body?.items || !Array.isArray(body.items) || body.items.length === 0) {
+    return c.json({ error: 'items wajib diisi (array of {value, type})' }, 400);
+  }
+  if (body.items.length > MAX_BULK_ITEMS) {
+    return c.json({ error: `Maksimal ${MAX_BULK_ITEMS} IOC per batch` }, 400);
+  }
+
+  const items = body.items.filter(
+    (i): i is BulkInput => !!i?.value && VALID_TYPES.includes(i?.type) && isValidIoc(i.value, i.type),
+  );
+  if (items.length === 0) {
+    return c.json({ error: 'Tidak ada IOC dengan format yang valid' }, 400);
+  }
+
+  const rows = await checkThreatVaultBulk(items, c.env.THREATVAULT_API_KEY);
+  // `skipped` dilaporkan supaya IOC yang ditolak validasi tidak hilang diam-diam.
+  return c.json({ rows, skipped: body.items.length - items.length });
+});
+
+// Cakupan CVE: apakah Palo Alto sudah punya signature untuk CVE tertentu.
+app.get('/vendor/threat-vault/cve', requireAuth, async (c) => {
+  const cve = c.req.query('cve')?.trim() ?? '';
+  if (!CVE_PATTERN.test(cve)) {
+    return c.json({ error: 'Format CVE tidak valid. Contoh: CVE-2024-3400' }, 400);
+  }
+
+  const result = await checkThreatVaultCve(cve, c.env.THREATVAULT_API_KEY);
+  return c.json({ cve: cve.toUpperCase(), ...result });
 });
 
 // --- Berita CVE & Ransomware (dibaca dari cache KV, diisi oleh worker terpisah news-cron/) ---

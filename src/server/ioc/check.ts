@@ -1,5 +1,6 @@
 import type { IocType, ProviderResult } from './types';
-import { checkVirusTotal, checkAbuseIPDB, checkOTX, checkMxToolbox, checkThreatVault } from './providers';
+import { checkVirusTotal, checkAbuseIPDB, checkOTX, checkMxToolbox } from './providers';
+import { checkThreatVault } from './threat-vault';
 import { aggregateVerdict } from './aggregate';
 
 export interface IocProviderEnv {

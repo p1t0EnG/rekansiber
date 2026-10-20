@@ -2,6 +2,7 @@
 import AppLayout from '../layouts/AppLayout.astro';
 import IocToolsTabs from '../components/IocToolsTabs.astro';
 import { getSessionUser } from '../server/auth/session';
+import { MAX_BULK_ITEMS } from '../server/ioc/types';
 
 const db = Astro.locals.runtime.env.DB;
 const token = Astro.cookies.get('session')?.value;
@@ -23,8 +24,8 @@ if (!user) {
   <div class="page-header">
     <h2 style="font-size:1.15rem;">Vendor Lookup</h2>
     <p>
-      Cek satu IOC ke vendor-vendor spesifik: Palo Alto Threat Vault tampil langsung di sini,
-      sisanya dibukakan ke portal resminya tanpa perlu copy-paste ke banyak tab.
+      Cek IOC ke vendor-vendor spesifik. Palo Alto Threat Vault dijawab langsung di sini;
+      Cisco Talos, Symantec Site Review, dan Akamai dibukakan ke portal resminya.
     </p>
   </div>
 
@@ -32,9 +33,9 @@ if (!user) {
     <strong class="callout-title">Mana yang otomatis, mana yang dibuka manual</strong>
     <ul>
       <li>
-        <mark>Palo Alto Threat Vault</mark> punya API terbuka, jadi hasilnya langsung tampil di
-        kartunya -- untuk <strong>hash file</strong> (signature antivirus + verdict WildFire) dan
-        <strong>alamat IP</strong> (keanggotaan IP feed Threat Prevention).
+        <mark>Palo Alto Threat Vault</mark> punya API terbuka: <strong>hash file</strong> (signature
+        antivirus + verdict WildFire), <strong>alamat IP</strong> (IP feed Threat Prevention), dan
+        <strong>CVE</strong> (apakah sudah ada signature-nya). Bisa satuan maupun massal.
       </li>
       <li>
         <mark>Cisco Talos</mark> dan <mark>Symantec Site Review</mark> tidak menyediakan API publik,
@@ -49,25 +50,132 @@ if (!user) {
     </ul>
   </div>
 
-  <div class="card">
-    <div class="field">
-      <label for="vendor-value">IOC yang mau dicek</label>
-      <div class="input-row">
-        <input
-          id="vendor-value"
-          type="text"
-          placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f"
-          autocomplete="off"
-        />
-        <span id="vendor-type-badge" class="badge" style="display:none;"></span>
-      </div>
-      <p id="vendor-hint" class="hint" style="margin:0.5rem 0 0;"></p>
-    </div>
+  <div class="mode-switch" role="tablist" aria-label="Mode Vendor Lookup">
+    <button type="button" class="mode-btn active" data-mode="single" role="tab" aria-selected="true">
+      Satu IOC
+    </button>
+    <button type="button" class="mode-btn" data-mode="bulk" role="tab" aria-selected="false">
+      Banyak IOC
+    </button>
+    <button type="button" class="mode-btn" data-mode="cve" role="tab" aria-selected="false">
+      Cek CVE
+    </button>
   </div>
 
-  <div id="vendor-grid" class="vendor-grid"></div>
+  <!-- ===== Mode: satu IOC ===== -->
+  <section id="panel-single">
+    <div class="card">
+      <div class="field">
+        <label for="vendor-value">IOC yang mau dicek</label>
+        <div class="input-row">
+          <input
+            id="vendor-value"
+            type="text"
+            placeholder="Contoh: 8.8.8.8 atau google.com atau https://google.com atau 44d88612fea8a8f36de82e1278abb02f"
+            autocomplete="off"
+          />
+          <span id="vendor-type-badge" class="badge" style="display:none;"></span>
+        </div>
+        <p id="vendor-hint" class="hint" style="margin:0.5rem 0 0;"></p>
+      </div>
+    </div>
+
+    <div id="vendor-grid" class="vendor-grid"></div>
+  </section>
+
+  <!-- ===== Mode: banyak IOC ===== -->
+  <section id="panel-bulk" hidden>
+    <div class="card">
+      <div class="field">
+        <label for="tv-bulk-input">Tempel daftar IOC (satu per baris)</label>
+        <textarea
+          id="tv-bulk-input"
+          rows="8"
+          placeholder="103.240.206.116&#10;44d88612fea8a8f36de82e1278abb02f&#10;275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+        ></textarea>
+        <p id="tv-bulk-hint" class="hint" style="margin:0.5rem 0 0;"></p>
+      </div>
+      <div class="btn-row">
+        <button id="tv-bulk-run" type="button" class="btn">Cek ke Palo Alto</button>
+        <button id="tv-bulk-copy" type="button" class="btn btn-secondary" disabled>
+          Salin yang tidak didukung
+        </button>
+      </div>
+      <p id="tv-bulk-status" class="status-message" role="status"></p>
+    </div>
+
+    <div class="card" id="tv-bulk-results-card" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>IOC</th>
+            <th>Tipe</th>
+            <th>Verdict</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="tv-bulk-results-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="tv-bulk-portals" style="display:none;">
+      <strong style="font-size:0.95rem;">Vendor yang harus dibuka manual</strong>
+      <p class="hint" style="margin:0.35rem 0 0.9rem;">
+        Talos, Site Review, dan Akamai tidak bisa dicek massal lewat API. Salin IOC yang belum
+        terjawab di atas, lalu buka portalnya.
+      </p>
+      <div class="btn-row" id="tv-bulk-portal-links"></div>
+    </div>
+  </section>
+
+  <!-- ===== Mode: CVE ===== -->
+  <section id="panel-cve" hidden>
+    <div class="card">
+      <div class="field">
+        <label for="cve-input">Nomor CVE</label>
+        <div class="input-row">
+          <input id="cve-input" type="text" placeholder="Contoh: CVE-2024-3400" autocomplete="off" />
+        </div>
+        <p class="hint" style="margin:0.5rem 0 0;">
+          Mengecek apakah Palo Alto sudah punya signature vulnerability yang menutup CVE ini.
+        </p>
+      </div>
+      <div class="btn-row">
+        <button id="cve-run" type="button" class="btn">Cek signature Palo Alto</button>
+      </div>
+      <p id="cve-status" class="status-message" role="status"></p>
+    </div>
+
+    <div id="cve-results"></div>
+  </section>
 
   <style is:global>
+    .mode-switch {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .mode-btn {
+      padding: 0.45rem 0.95rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .mode-btn:hover {
+      color: var(--text);
+    }
+    .mode-btn.active {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
     .vendor-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -128,16 +236,42 @@ if (!user) {
       font-size: 0.85rem;
       margin: 0;
     }
+
+    .tv-unsupported td {
+      color: var(--text-muted);
+    }
+    .cve-sig {
+      margin-bottom: 1rem;
+    }
+    .cve-sig-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.45rem;
+    }
+    .cve-sig-head strong {
+      font-size: 0.95rem;
+    }
+    .cve-sig-desc {
+      font-size: 0.86rem;
+      line-height: 1.6;
+      margin: 0 0 0.6rem;
+    }
+    .cve-sig-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
   </style>
 
   <script>
     import { detectIocType } from '../server/ioc/validate';
-    import { vendorsFor } from '../server/ioc/vendors';
-
-    const input = document.getElementById('vendor-value') as HTMLInputElement;
-    const badge = document.getElementById('vendor-type-badge') as HTMLSpanElement;
-    const hint = document.getElementById('vendor-hint')!;
-    const grid = document.getElementById('vendor-grid')!;
+    import { vendorsFor, ALL_VENDORS } from '../server/ioc/vendors';
+    import { MAX_BULK_ITEMS } from '../server/ioc/types';
+    import type { IocType, Verdict } from '../server/ioc/types';
 
     const TYPE_LABEL: Record<string, string> = {
       ip: 'IP Address',
@@ -145,6 +279,13 @@ if (!user) {
       hash: 'File Hash',
       url: 'URL',
       email: 'Email',
+    };
+
+    const VERDICT_LABEL: Record<string, string> = {
+      clean: 'Bersih',
+      suspicious: 'Mencurigakan',
+      malicious: 'Berbahaya',
+      unknown: 'Tidak diketahui',
     };
 
     async function copyToClipboard(text: string): Promise<void> {
@@ -162,18 +303,61 @@ if (!user) {
       }
     }
 
-    const VERDICT_LABEL: Record<string, string> = {
-      clean: 'Bersih',
-      suspicious: 'Mencurigakan',
-      malicious: 'Berbahaya',
-      unknown: 'Tidak diketahui',
+    // ===== Pemindah mode =====
+    const panels: Record<string, HTMLElement> = {
+      single: document.getElementById('panel-single')!,
+      bulk: document.getElementById('panel-bulk')!,
+      cve: document.getElementById('panel-cve')!,
     };
+
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.mode-btn')) {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode!;
+        for (const other of document.querySelectorAll<HTMLButtonElement>('.mode-btn')) {
+          const on = other === btn;
+          other.classList.toggle('active', on);
+          other.setAttribute('aria-selected', String(on));
+        }
+        for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== mode;
+      });
+    }
+
+    // ===== Mode 1: satu IOC =====
+    const input = document.getElementById('vendor-value') as HTMLInputElement;
+    const badge = document.getElementById('vendor-type-badge') as HTMLSpanElement;
+    const hint = document.getElementById('vendor-hint')!;
+    const grid = document.getElementById('vendor-grid')!;
 
     // Input berubah tiap ketikan, jadi panggilan API ditunda sampai user berhenti
     // mengetik. `liveSeq` membuang hasil yang datang terlambat setelah nilainya
     // sudah berganti -- tanpa itu, jawaban lama bisa menimpa jawaban baru.
     let liveTimer: number | undefined;
     let liveSeq = 0;
+
+    function showResult(box: HTMLElement, verdict: string, detail: string) {
+      box.innerHTML = '';
+      const head = document.createElement('div');
+      head.className = 'vendor-result-head';
+      const vb = document.createElement('span');
+      vb.className = `badge badge-${verdict}`;
+      vb.textContent = VERDICT_LABEL[verdict] ?? verdict;
+      head.appendChild(vb);
+
+      const detailEl = document.createElement('p');
+      detailEl.className = 'vendor-result-detail';
+      detailEl.textContent = detail;
+
+      box.appendChild(head);
+      box.appendChild(detailEl);
+    }
+
+    function showMessage(box: HTMLElement, text: string) {
+      box.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'vendor-result-waiting';
+      p.textContent = text;
+      box.appendChild(p);
+    }
 
     async function runLiveLookup(box: HTMLElement, value: string, type: string, seq: number) {
       try {
@@ -186,38 +370,13 @@ if (!user) {
         if (seq !== liveSeq) return;
 
         if (!res.ok || !data.result) {
-          box.innerHTML = '';
-          const err = document.createElement('p');
-          err.className = 'vendor-result-waiting';
-          err.textContent = data.error ?? `Gagal mengambil hasil (HTTP ${res.status}).`;
-          box.appendChild(err);
+          showMessage(box, data.error ?? `Gagal mengambil hasil (HTTP ${res.status}).`);
           return;
         }
-
-        const { verdict, detail } = data.result;
-        box.innerHTML = '';
-
-        const head = document.createElement('div');
-        head.className = 'vendor-result-head';
-
-        const vb = document.createElement('span');
-        vb.className = `badge badge-${verdict}`;
-        vb.textContent = VERDICT_LABEL[verdict] ?? verdict;
-        head.appendChild(vb);
-
-        const detailEl = document.createElement('p');
-        detailEl.className = 'vendor-result-detail';
-        detailEl.textContent = detail;
-
-        box.appendChild(head);
-        box.appendChild(detailEl);
+        showResult(box, data.result.verdict, data.result.detail);
       } catch {
         if (seq !== liveSeq) return;
-        box.innerHTML = '';
-        const err = document.createElement('p');
-        err.className = 'vendor-result-waiting';
-        err.textContent = 'Gagal menghubungi API vendor.';
-        box.appendChild(err);
+        showMessage(box, 'Gagal menghubungi API vendor.');
       }
     }
 
@@ -297,10 +456,7 @@ if (!user) {
         if (vendor.liveApi) {
           const box = document.createElement('div');
           box.className = 'vendor-result';
-          const waiting = document.createElement('p');
-          waiting.className = 'vendor-result-waiting';
-          waiting.textContent = 'Memeriksa ke API vendor...';
-          box.appendChild(waiting);
+          showMessage(box, 'Memeriksa ke API vendor...');
           card.appendChild(box);
           liveBoxes.push(box);
         }
@@ -334,5 +490,314 @@ if (!user) {
     }
 
     input.addEventListener('input', render);
+
+    // ===== Mode 2: banyak IOC =====
+    interface BulkRow {
+      value: string;
+      type: IocType;
+      supported: boolean;
+      verdict: Verdict;
+      detail: string;
+      error?: boolean;
+    }
+
+    const bulkInput = document.getElementById('tv-bulk-input') as HTMLTextAreaElement;
+    const bulkHint = document.getElementById('tv-bulk-hint')!;
+    const bulkRun = document.getElementById('tv-bulk-run') as HTMLButtonElement;
+    const bulkCopy = document.getElementById('tv-bulk-copy') as HTMLButtonElement;
+    const bulkStatus = document.getElementById('tv-bulk-status')!;
+    const bulkCard = document.getElementById('tv-bulk-results-card') as HTMLElement;
+    const bulkBody = document.getElementById('tv-bulk-results-body')!;
+    const portalCard = document.getElementById('tv-bulk-portals') as HTMLElement;
+    const portalLinks = document.getElementById('tv-bulk-portal-links')!;
+
+    let unsupportedValues: string[] = [];
+
+    function parseBulk(): { value: string; type: IocType }[] {
+      const seen = new Set<string>();
+      const items: { value: string; type: IocType }[] = [];
+
+      for (const raw of bulkInput.value.split(/[\r\n,;]+/)) {
+        const value = raw.trim();
+        if (!value) continue;
+        const type = detectIocType(value);
+        if (!type) continue;
+        // Duplikat dibuang di sini supaya tidak memakan kuota Threat Vault dua kali.
+        const key = `${type}:${value.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push({ value, type });
+      }
+      return items;
+    }
+
+    function updateBulkHint() {
+      const items = parseBulk();
+      const lines = bulkInput.value.split(/[\r\n,;]+/).filter((l) => l.trim()).length;
+      const dropped = lines - items.length;
+
+      if (lines === 0) {
+        bulkHint.textContent = '';
+        return;
+      }
+      const counts = new Map<string, number>();
+      for (const i of items) counts.set(i.type, (counts.get(i.type) ?? 0) + 1);
+      const parts = [...counts].map(([t, n]) => `${n} ${TYPE_LABEL[t]}`);
+
+      bulkHint.textContent =
+        `${items.length} IOC unik` +
+        (parts.length ? ` (${parts.join(', ')})` : '') +
+        (dropped > 0 ? ` -- ${dropped} baris dilewati (duplikat atau format tidak dikenali)` : '') +
+        (items.length > MAX_BULK_ITEMS ? ` -- melebihi batas ${MAX_BULK_ITEMS}` : '');
+    }
+
+    bulkInput.addEventListener('input', updateBulkHint);
+
+    function renderPortals(items: { type: IocType }[]) {
+      portalLinks.innerHTML = '';
+      const types = new Set(items.map((i) => i.type));
+      const vendors = ALL_VENDORS.filter((v) => !v.liveApi && v.supports.some((t) => types.has(t)));
+
+      for (const vendor of vendors) {
+        const a = document.createElement('a');
+        a.className = 'btn btn-secondary';
+        // Di mode massal tidak ada satu nilai untuk diisikan, jadi parameter
+        // pencarian yang kosong dibuang -- portalnya dibuka di halaman lookup-nya.
+        a.href = vendor.buildUrl('').replace(/[?&][^=&]+=$/, '');
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = `${vendor.name} →`;
+        portalLinks.appendChild(a);
+      }
+      portalCard.style.display = vendors.length ? 'block' : 'none';
+    }
+
+    function renderBulk(rows: BulkRow[]) {
+      bulkBody.innerHTML = '';
+      unsupportedValues = [];
+
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        if (!r.supported) tr.className = 'tv-unsupported';
+
+        const valueTd = document.createElement('td');
+        valueTd.textContent = r.value;
+
+        const typeTd = document.createElement('td');
+        typeTd.textContent = TYPE_LABEL[r.type] ?? r.type;
+
+        const verdictTd = document.createElement('td');
+        if (r.supported) {
+          const b = document.createElement('span');
+          b.className = `badge badge-${r.verdict}`;
+          b.textContent = VERDICT_LABEL[r.verdict] ?? r.verdict;
+          verdictTd.appendChild(b);
+        } else {
+          verdictTd.textContent = '—';
+          unsupportedValues.push(r.value);
+        }
+
+        const detailTd = document.createElement('td');
+        detailTd.textContent = r.detail;
+
+        tr.appendChild(valueTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(verdictTd);
+        tr.appendChild(detailTd);
+        bulkBody.appendChild(tr);
+      }
+
+      bulkCard.style.display = rows.length ? 'block' : 'none';
+      bulkCopy.disabled = unsupportedValues.length === 0;
+    }
+
+    function summarize(rows: BulkRow[]): string {
+      const counts = { malicious: 0, suspicious: 0, clean: 0, unknown: 0 } as Record<string, number>;
+      let unsupported = 0;
+      for (const r of rows) {
+        if (!r.supported) unsupported++;
+        else counts[r.verdict] = (counts[r.verdict] ?? 0) + 1;
+      }
+      const parts: string[] = [];
+      if (counts.malicious) parts.push(`${counts.malicious} berbahaya`);
+      if (counts.suspicious) parts.push(`${counts.suspicious} mencurigakan`);
+      if (counts.clean) parts.push(`${counts.clean} bersih`);
+      if (counts.unknown) parts.push(`${counts.unknown} tidak diketahui`);
+      if (unsupported) parts.push(`${unsupported} di luar cakupan Threat Vault`);
+      return parts.join(', ');
+    }
+
+    bulkRun.addEventListener('click', async () => {
+      const items = parseBulk();
+
+      if (items.length === 0) {
+        bulkStatus.textContent = 'Belum ada IOC yang bisa dibaca. Tempel satu IOC per baris.';
+        return;
+      }
+      if (items.length > MAX_BULK_ITEMS) {
+        bulkStatus.textContent = `Maksimal ${MAX_BULK_ITEMS} IOC sekali jalan. Saat ini ${items.length}.`;
+        return;
+      }
+
+      bulkRun.disabled = true;
+      bulkStatus.textContent = `Memeriksa ${items.length} IOC ke Palo Alto...`;
+
+      try {
+        const res = await fetch('/api/vendor/threat-vault/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        });
+        const data = (await res.json()) as { rows?: BulkRow[]; skipped?: number; error?: string };
+
+        if (!res.ok || !data.rows) {
+          bulkStatus.textContent = data.error ?? `Gagal memeriksa (HTTP ${res.status}).`;
+          return;
+        }
+
+        renderBulk(data.rows);
+        renderPortals(items);
+
+        const failed = data.rows.filter((r) => r.error).length;
+        bulkStatus.textContent =
+          `Selesai: ${summarize(data.rows)}.` +
+          (data.skipped ? ` ${data.skipped} IOC ditolak validasi server.` : '') +
+          (failed ? ` ${failed} gagal diperiksa -- jangan anggap aman, ulangi.` : '');
+      } catch {
+        bulkStatus.textContent = 'Gagal menghubungi server.';
+      } finally {
+        bulkRun.disabled = false;
+      }
+    });
+
+    bulkCopy.addEventListener('click', () => {
+      if (unsupportedValues.length === 0) return;
+      void copyToClipboard(unsupportedValues.join('\n'));
+      bulkCopy.textContent = 'Tersalin!';
+      setTimeout(() => (bulkCopy.textContent = 'Salin yang tidak didukung'), 1500);
+    });
+
+    // ===== Mode 3: CVE =====
+    interface CveSignature {
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      severity: string;
+      defaultAction: string;
+      status: string;
+      references: string[];
+      latestRelease: string;
+    }
+
+    const cveInput = document.getElementById('cve-input') as HTMLInputElement;
+    const cveRun = document.getElementById('cve-run') as HTMLButtonElement;
+    const cveStatus = document.getElementById('cve-status')!;
+    const cveResults = document.getElementById('cve-results')!;
+
+    function renderCve(cve: string, signatures: CveSignature[]) {
+      cveResults.innerHTML = '';
+
+      for (const sig of signatures) {
+        const card = document.createElement('div');
+        card.className = 'card cve-sig';
+
+        const head = document.createElement('div');
+        head.className = 'cve-sig-head';
+
+        const name = document.createElement('strong');
+        name.textContent = sig.name || `Signature ${sig.id}`;
+        head.appendChild(name);
+
+        if (sig.severity) {
+          const sev = document.createElement('span');
+          // severity "critical"/"high" dipetakan ke badge merah supaya sekilas kelihatan.
+          const high = ['critical', 'high'].includes(sig.severity.toLowerCase());
+          sev.className = `badge badge-${high ? 'malicious' : 'suspicious'}`;
+          sev.textContent = sig.severity;
+          head.appendChild(sev);
+        }
+        card.appendChild(head);
+
+        if (sig.description) {
+          const desc = document.createElement('p');
+          desc.className = 'cve-sig-desc';
+          desc.textContent = sig.description;
+          card.appendChild(desc);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'cve-sig-meta';
+        const bits: string[] = [];
+        if (sig.id) bits.push(`ID signature: ${sig.id}`);
+        if (sig.category) bits.push(`Kategori: ${sig.category}`);
+        if (sig.defaultAction) bits.push(`Aksi default: ${sig.defaultAction}`);
+        if (sig.status) bits.push(`Status: ${sig.status}`);
+        if (sig.latestRelease) bits.push(`Rilis konten: ${sig.latestRelease}`);
+        for (const bit of bits) {
+          const span = document.createElement('span');
+          span.textContent = bit;
+          meta.appendChild(span);
+        }
+        card.appendChild(meta);
+
+        for (const ref of sig.references.slice(0, 3)) {
+          const a = document.createElement('a');
+          a.href = ref;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = ref;
+          a.style.cssText = 'display:block;font-size:0.8rem;margin-top:0.5rem;overflow-wrap:anywhere;';
+          card.appendChild(a);
+        }
+
+        cveResults.appendChild(card);
+      }
+    }
+
+    async function runCve() {
+      const cve = cveInput.value.trim().toUpperCase();
+      cveResults.innerHTML = '';
+
+      if (!/^CVE-\d{4}-\d{4,}$/.test(cve)) {
+        cveStatus.textContent = 'Format CVE tidak valid. Contoh: CVE-2024-3400';
+        return;
+      }
+
+      cveRun.disabled = true;
+      cveStatus.textContent = `Memeriksa ${cve} di Threat Vault...`;
+
+      try {
+        const res = await fetch(`/api/vendor/threat-vault/cve?cve=${encodeURIComponent(cve)}`);
+        const data = (await res.json()) as {
+          covered?: boolean;
+          signatures?: CveSignature[];
+          message?: string;
+          error?: string;
+        };
+
+        if (!res.ok) {
+          cveStatus.textContent = data.error ?? `Gagal memeriksa (HTTP ${res.status}).`;
+          return;
+        }
+        if (!data.covered || !data.signatures?.length) {
+          cveStatus.textContent =
+            data.message ?? `Belum ada signature Palo Alto untuk ${cve}.`;
+          return;
+        }
+
+        cveStatus.textContent = `${cve} ditutup oleh ${data.signatures.length} signature Palo Alto.`;
+        renderCve(cve, data.signatures);
+      } catch {
+        cveStatus.textContent = 'Gagal menghubungi server.';
+      } finally {
+        cveRun.disabled = false;
+      }
+    }
+
+    cveRun.addEventListener('click', () => void runCve());
+    cveInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') void runCve();
+    });
   </script>
 </AppLayout>
