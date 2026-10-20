@@ -152,8 +152,29 @@ perlu hubungkan D1 & KV binding ke Pages project juga (bukan cuma di
    database `rekansiber-db`
 3. Di bagian **KV namespace bindings**, tambahkan binding `NEWS_CACHE` →
    pilih namespace yang tadi dibuat
-4. Di **Settings → Environment variables**, tambahkan `VT_API_KEY`,
-   `ABUSEIPDB_API_KEY`, `OTX_API_KEY`, `SESSION_SECRET` (centang **Encrypt**)
+4. Di **Settings → Variables and Secrets**, tambahkan `VT_API_KEY`,
+   `ABUSEIPDB_API_KEY`, `OTX_API_KEY`, `SESSION_SECRET`, dan (opsional)
+   `MXTOOLBOX_API_KEY`, `THREATVAULT_API_KEY` — pilih tipe **Secret**
+   (terenkripsi), dan pastikan di environment **Production**
+
+> **PENTING — secret baru butuh deploy ulang.**
+> Cloudflare Pages menyuntikkan environment variable ke *deployment saat
+> deployment itu dibuat*. Deployment yang sudah jalan **tidak** ikut berubah
+> waktu kamu menambah atau mengedit secret. Jadi setelah menyimpan secret
+> baru di dashboard, kamu harus memicu deploy baru — push commit, atau klik
+> **Retry deployment** pada deployment terakhir. Kalau tidak, provider-nya
+> tetap tampil "belum dikonfigurasi" padahal key-nya sudah benar.
+
+Buat memastikan secret benar-benar sampai ke Worker setelah deploy, login
+sebagai **admin** lalu buka:
+
+```
+https://rekansiber.pages.dev/api/health/providers
+```
+
+Endpoint itu melaporkan `true`/`false` per key (**tidak pernah** nilainya) plus
+daftar nama binding yang ada di runtime — berguna untuk membedakan "secret
+belum tersimpan" dari "tersimpan tapi namanya salah tulis".
 
 ---
 
