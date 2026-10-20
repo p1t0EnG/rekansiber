@@ -13,3 +13,8 @@ MXTOOLBOX_API_KEY=isi_api_key_mxtoolbox_disini
 # String acak panjang untuk signing session/JWT. Generate dengan:
 # openssl rand -base64 48
 SESSION_SECRET=ganti_dengan_random_string_panjang_dan_acak
+
+# Opsional -- untuk pengecekan hash file di Palo Alto Threat Vault.
+# Butuh langganan Threat Prevention/ATP aktif; key diambil dari Customer Support Portal.
+# Tanpa key ini, hasil Threat Vault tampil "belum dikonfigurasi".
+THREATVAULT_API_KEY=isi_api_key_threatvault_disini

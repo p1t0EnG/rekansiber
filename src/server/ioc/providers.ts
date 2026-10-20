@@ -174,3 +174,105 @@ export async function checkMxToolbox(
     return { name: 'MXToolbox', verdict: 'unknown', detail: 'Gagal menghubungi MXToolbox', error: true };
   }
 }
+
+// Palo Alto Threat Vault: cek apakah hash file punya signature antivirus di PAN-DB.
+// Hanya untuk hash, dan hanya MD5/SHA-256 (SHA-1 tidak didukung API-nya -> return null
+// supaya kartunya tidak muncul). Butuh langganan Threat Prevention/ATP yang aktif;
+// tanpa API key, hasilnya ditandai "belum dikonfigurasi" (bukan error provider).
+const THREAT_VAULT_URL = 'https://api.threatvault.paloaltonetworks.com/service/v1/threats';
+
+export async function checkThreatVault(
+  value: string,
+  type: IocType,
+  apiKey: string | undefined,
+): Promise<ProviderResult | null> {
+  if (type !== 'hash') return null;
+
+  // 32 hex = MD5, 64 hex = SHA-256. SHA-1 (40) tidak didukung.
+  const param = value.length === 32 ? 'md5' : value.length === 64 ? 'sha256' : null;
+  if (!param) return null;
+
+  if (!apiKey) {
+    return {
+      name: 'Threat Vault',
+      verdict: 'unknown',
+      detail: 'API key Threat Vault belum dikonfigurasi (set THREATVAULT_API_KEY)',
+    };
+  }
+
+  try {
+    const res = await fetch(`${THREAT_VAULT_URL}?${param}=${encodeURIComponent(value)}`, {
+      headers: { 'X-API-KEY': apiKey, Accept: 'application/json' },
+    });
+
+    // Tidak ada signature yang cocok -- wajar, bukan kegagalan.
+    if (res.status === 404) {
+      return { name: 'Threat Vault', verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return {
+        name: 'Threat Vault',
+        verdict: 'unknown',
+        detail: `API key ditolak (${res.status}) -- cek key dan status langganan`,
+        error: true,
+      };
+    }
+    if (!res.ok) {
+      return { name: 'Threat Vault', verdict: 'unknown', detail: `API error (${res.status})`, error: true };
+    }
+
+    const data = await res.json<any>();
+
+    // Bentuk respons nyata (diverifikasi langsung ke API):
+    //   { success, count, data: { fileinfo: [ { type, family, platform, wildfire_verdict,
+    //     signatures: { antivirus: [ { name, severity } ] } } ] } }
+    // FAIL-SAFE: hanya simpulkan "clean" kalau responsnya memang BERBENTUK hasil kosong
+    // yang kita kenali. Struktur tak dikenali -> unknown, jangan tebak clean, supaya
+    // hash berbahaya tidak pernah lolos dianggap aman.
+    if (!data || typeof data !== 'object' || data.success !== true) {
+      return {
+        name: 'Threat Vault',
+        verdict: 'unknown',
+        detail: 'Format respons Threat Vault tidak dikenali -- cek manual di portal',
+        error: true,
+      };
+    }
+
+    const files: any[] = Array.isArray(data?.data?.fileinfo) ? data.data.fileinfo : [];
+    if (files.length === 0) {
+      return { name: 'Threat Vault', verdict: 'clean', detail: 'Tidak ada signature antivirus yang cocok' };
+    }
+
+    const file = files[0] ?? {};
+    const wildfire = typeof file.wildfire_verdict === 'string' ? file.wildfire_verdict.toLowerCase() : '';
+    const avSignatures: any[] = Array.isArray(file?.signatures?.antivirus) ? file.signatures.antivirus : [];
+
+    // wildfire_verdict adalah penilaian resmi Palo Alto; kalau tidak ada, adanya
+    // signature antivirus sendiri sudah menandakan file dikenali berbahaya.
+    const verdict: Verdict =
+      wildfire === 'malicious' || wildfire === 'phishing'
+        ? 'malicious'
+        : wildfire === 'grayware'
+          ? 'suspicious'
+          : wildfire === 'benign'
+            ? 'clean'
+            : avSignatures.length > 0
+              ? 'malicious'
+              : 'unknown';
+
+    const descriptor = [file.type, file.family].filter((x) => typeof x === 'string' && x.trim()).join('/');
+    const sigName = typeof avSignatures[0]?.name === 'string' ? avSignatures[0].name : '';
+    const detail = [
+      descriptor || 'Sampel dikenali',
+      file.platform ? `(${file.platform})` : '',
+      wildfire ? `-- WildFire: ${wildfire}` : '',
+      avSignatures.length ? `-- ${avSignatures.length} signature AV${sigName ? `: ${sigName}` : ''}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return { name: 'Threat Vault', verdict, detail };
+  } catch {
+    return { name: 'Threat Vault', verdict: 'unknown', detail: 'Gagal menghubungi Threat Vault', error: true };
+  }
+}

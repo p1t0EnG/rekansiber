@@ -29,6 +29,7 @@ type Bindings = {
   ABUSEIPDB_API_KEY: string;
   OTX_API_KEY: string;
   MXTOOLBOX_API_KEY?: string;
+  THREATVAULT_API_KEY?: string;
   SESSION_SECRET: string;
 };
 
