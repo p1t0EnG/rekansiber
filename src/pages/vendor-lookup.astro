@@ -25,7 +25,7 @@ if (!user) {
     <h2 style="font-size:1.15rem;">Vendor Lookup</h2>
     <p>
       Cek IOC ke vendor-vendor spesifik. Palo Alto Threat Vault dijawab langsung di sini;
-      Cisco Talos, Symantec Site Review, dan Akamai dibukakan ke portal resminya.
+      Cisco Talos, Symantec Site Review, dan Zscaler dibukakan ke portal resminya.
     </p>
   </div>
 
@@ -38,10 +38,10 @@ if (!user) {
         <strong>CVE</strong> (apakah sudah ada signature-nya). Bisa satuan maupun massal.
       </li>
       <li>
-        <mark>Cisco Talos</mark> dan <mark>Symantec Site Review</mark> tidak menyediakan API publik,
-        dan kebijakan mereka melarang pengecekan otomatis. <mark>Akamai</mark> hanya menyediakan
-        lookup di dalam produk ETP / Secure Internet Access. Untuk ketiganya kita bantu berpindah
-        cepat ke portal resminya, bukan mengambil datanya diam-diam.
+        <mark>Cisco Talos</mark>, <mark>Symantec Site Review</mark>, dan <mark>Zscaler</mark> tidak
+        menyediakan pengecekan massal lewat API publik. Di mode <strong>Banyak IOC</strong>, tiap
+        portal tetap dapat kartunya sendiri berisi IOC yang memang diterima portal itu -- tinggal
+        salin lalu tempel di sana.
       </li>
       <li>
         Untuk verdict gabungan beberapa sumber sekaligus, pakai tab <strong>IOC Checker</strong>
@@ -118,13 +118,15 @@ if (!user) {
       </table>
     </div>
 
-    <div class="card" id="tv-bulk-portals" style="display:none;">
-      <strong style="font-size:0.95rem;">Vendor yang harus dibuka manual</strong>
-      <p class="hint" style="margin:0.35rem 0 0.9rem;">
-        Talos, Site Review, dan Akamai tidak bisa dicek massal lewat API. Salin IOC yang belum
-        terjawab di atas, lalu buka portalnya.
-      </p>
-      <div class="btn-row" id="tv-bulk-portal-links"></div>
+    <div id="tv-bulk-portals" style="display:none;">
+      <div class="page-header" style="margin-top:1.5rem;">
+        <h3 style="font-size:1rem;">Vendor lain -- dibuka manual</h3>
+        <p>
+          Talos, Site Review, dan Zscaler tidak menyediakan pengecekan massal lewat API publik.
+          Tiap kartu sudah menyaring IOC yang diterima portalnya, jadi kamu tidak perlu memilah sendiri.
+        </p>
+      </div>
+      <div class="vendor-grid" id="tv-bulk-portal-cards"></div>
     </div>
   </section>
 
@@ -509,7 +511,7 @@ if (!user) {
     const bulkCard = document.getElementById('tv-bulk-results-card') as HTMLElement;
     const bulkBody = document.getElementById('tv-bulk-results-body')!;
     const portalCard = document.getElementById('tv-bulk-portals') as HTMLElement;
-    const portalLinks = document.getElementById('tv-bulk-portal-links')!;
+    const portalCards = document.getElementById('tv-bulk-portal-cards')!;
 
     let unsupportedValues: string[] = [];
 
@@ -553,23 +555,78 @@ if (!user) {
 
     bulkInput.addEventListener('input', updateBulkHint);
 
-    function renderPortals(items: { type: IocType }[]) {
-      portalLinks.innerHTML = '';
-      const types = new Set(items.map((i) => i.type));
-      const vendors = ALL_VENDORS.filter((v) => !v.liveApi && v.supports.some((t) => types.has(t)));
+    function renderPortals(items: { value: string; type: IocType }[]) {
+      portalCards.innerHTML = '';
+      let shown = 0;
 
-      for (const vendor of vendors) {
-        const a = document.createElement('a');
-        a.className = 'btn btn-secondary';
+      for (const vendor of ALL_VENDORS) {
+        if (vendor.liveApi) continue;
+
+        // `accepts` mempersempit lebih jauh dari `supports` -- mis. Talos File
+        // Reputation cuma menerima SHA-256, jadi MD5 tidak ikut tersalin.
+        const subset = items.filter(
+          (i) => vendor.supports.includes(i.type) && (!vendor.accepts || vendor.accepts(i.value, i.type)),
+        );
+        if (subset.length === 0) continue;
+        shown++;
+
+        const card = document.createElement('div');
+        card.className = 'card vendor-card';
+
+        const head = document.createElement('div');
+        head.className = 'vendor-card-head';
+        const name = document.createElement('strong');
+        name.textContent = vendor.name;
+        const count = document.createElement('span');
+        count.className = 'badge badge-unknown';
+        count.textContent = `${subset.length} IOC`;
+        head.appendChild(name);
+        head.appendChild(count);
+
+        const checks = document.createElement('p');
+        checks.className = 'vendor-checks';
+        checks.textContent = vendor.checks;
+
+        card.appendChild(head);
+        card.appendChild(checks);
+
+        if (vendor.note) {
+          const note = document.createElement('p');
+          note.className = 'vendor-note';
+          note.textContent = vendor.note;
+          card.appendChild(note);
+        }
+
+        const row = document.createElement('div');
+        row.className = 'btn-row';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'btn btn-secondary';
+        const copyLabel = `Salin ${subset.length} IOC`;
+        copyBtn.textContent = copyLabel;
+        copyBtn.addEventListener('click', () => {
+          void copyToClipboard(subset.map((i) => i.value).join('\n'));
+          copyBtn.textContent = 'Tersalin!';
+          setTimeout(() => (copyBtn.textContent = copyLabel), 1500);
+        });
+
+        const openLink = document.createElement('a');
+        openLink.className = 'btn btn-secondary';
         // Di mode massal tidak ada satu nilai untuk diisikan, jadi parameter
         // pencarian yang kosong dibuang -- portalnya dibuka di halaman lookup-nya.
-        a.href = vendor.buildUrl('').replace(/[?&][^=&]+=$/, '');
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = `${vendor.name} →`;
-        portalLinks.appendChild(a);
+        openLink.href = vendor.buildUrl('').replace(/[?&][^=&]+=$/, '');
+        openLink.target = '_blank';
+        openLink.rel = 'noopener';
+        openLink.textContent = 'Buka portal →';
+
+        row.appendChild(copyBtn);
+        row.appendChild(openLink);
+        card.appendChild(row);
+        portalCards.appendChild(card);
       }
-      portalCard.style.display = vendors.length ? 'block' : 'none';
+
+      portalCard.style.display = shown ? 'block' : 'none';
     }
 
     function renderBulk(rows: BulkRow[]) {

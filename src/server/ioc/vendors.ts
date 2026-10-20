@@ -5,9 +5,12 @@ import type { IocType } from './types';
 //  - Cisco Talos tidak punya API reputasi publik, dan ToS-nya melarang scraping.
 //  - Symantec Site Review tidak punya API publik (dikonfirmasi KB Broadcom 175706),
 //    dan penggunaan otomatis melanggar acceptable use policy mereka.
-//  - Akamai hanya menyediakan lookup IOC di dalam produk ETP / Secure Internet Access.
-// Satu-satunya yang punya API terbuka adalah Palo Alto Threat Vault (`liveApi`),
-// untuk hash file dan alamat IP -- hasilnya ditampilkan langsung di kartunya.
+//  - Zscaler menyediakan lookup publik satu per satu; pengecekan massal lewat
+//    API-nya butuh tenant ZIA sendiri (lihat catatan tiap entri).
+// Satu-satunya yang punya API terbuka tanpa lisensi tambahan adalah Palo Alto
+// Threat Vault (`liveApi`), untuk hash file dan alamat IP -- hasilnya tampil
+// langsung di kartunya. Akamai dikeluarkan sementara atas permintaan tim
+// (status langganannya belum jelas).
 
 export interface VendorLookup {
   id: string;
@@ -22,6 +25,13 @@ export interface VendorLookup {
   liveApi?: boolean;
   /** Catatan penting (mis. butuh akun / batasan kebijakan) */
   note?: string;
+  /**
+   * Penyaring tambahan khusus mode massal. Sebagian portal lebih sempit dari
+   * `supports` -- mis. Talos File Reputation hanya menerima SHA-256, jadi daftar
+   * yang disalin untuk portal itu tidak boleh ikut membawa MD5.
+   * Tanpa ini, seluruh tipe di `supports` dianggap cocok.
+   */
+  accepts?: (value: string, type: IocType) => boolean;
   /** Halaman lookup. value sudah di-encode saat autofill. */
   buildUrl: (value: string) => string;
 }
@@ -43,6 +53,7 @@ const VENDORS: VendorLookup[] = [
     supports: ['hash'],
     autofill: false,
     note: 'Hanya menerima SHA-256, satu hash per pencarian.',
+    accepts: (value, type) => type === 'hash' && value.length === 64,
     buildUrl: () => 'https://www.talosintelligence.com/sha_searches',
   },
   {
@@ -74,13 +85,22 @@ const VENDORS: VendorLookup[] = [
     buildUrl: () => 'https://threatvault.paloaltonetworks.com/',
   },
   {
-    id: 'akamai',
-    name: 'Akamai — Control Center',
-    checks: 'Lookup IOC domain/IP (ETP / Secure Internet Access)',
-    supports: ['ip', 'domain', 'url'],
+    id: 'zscaler-sitereview',
+    name: 'Zscaler — Site Review',
+    checks: 'Kategori URL/domain di cloud Zscaler',
+    supports: ['domain', 'url'],
     autofill: false,
-    note: 'Akamai tidak punya lookup publik -- butuh akun ETP / Secure Internet Access.',
-    buildUrl: () => 'https://control.akamai.com/',
+    note: 'Lookup publik, satu per satu. Pengecekan massal lewat API butuh tenant ZIA (endpoint urlLookup, maks 100 URL sekali panggil).',
+    buildUrl: () => 'https://sitereview.zscaler.com/',
+  },
+  {
+    id: 'zscaler-zulu',
+    name: 'Zscaler — Zulu URL Risk Analyzer',
+    checks: 'Skor risiko konten dan reputasi satu URL',
+    supports: ['url'],
+    autofill: false,
+    note: 'Menganalisis isi halaman dan reputasinya, lalu memberi skor risiko.',
+    buildUrl: () => 'https://zulu.zscaler.com/',
   },
 ];
 
